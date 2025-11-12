@@ -12,6 +12,8 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 
 from pathlib import Path
 from decouple import config
+import os
+from urllib.parse import urlparse
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -26,7 +28,11 @@ SECRET_KEY = config('SECRET_KEY', default='django-insecure-zn!omu2bf011hqie!gbh3
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = config('DEBUG', default=True, cast=bool)
 
-ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1').split(',')
+ALLOWED_HOSTS = [h.strip() for h in config('ALLOWED_HOSTS', default='localhost,127.0.0.1').split(',') if h.strip()]
+
+# CSRF trusted origins (comma-separated URLs). Example: https://example.com,https://sub.example.com
+_csrf_origins = config('CSRF_TRUSTED_ORIGINS', default='')
+CSRF_TRUSTED_ORIGINS = [o.strip() for o in _csrf_origins.split(',') if o.strip()]
 
 # Production Security Settings
 if not DEBUG:
@@ -43,6 +49,25 @@ if not DEBUG:
     
     # Additional security headers
     SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
+    # Allow Render.com host automatically and set CSRF trusted origins
+    try:
+        render_url = config('RENDER_EXTERNAL_URL', default=os.getenv('RENDER_EXTERNAL_URL', ''))
+        if render_url:
+            parsed = urlparse(render_url)
+            host = parsed.netloc
+            scheme = parsed.scheme or 'https'
+            if host and host not in ALLOWED_HOSTS:
+                ALLOWED_HOSTS.append(host)
+            origin = f"{scheme}://{host}"
+            if origin not in CSRF_TRUSTED_ORIGINS:
+                CSRF_TRUSTED_ORIGINS.append(origin)
+        # Also allow any onrender.com subdomain as a safe default
+        if '.onrender.com' not in ALLOWED_HOSTS:
+            ALLOWED_HOSTS.append('.onrender.com')
+    except Exception:
+        # Fail-safe: don't crash settings on parsing issues
+        pass
 
 
 # Application definition
