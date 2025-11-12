@@ -1,0 +1,7 @@
+# Mise configuration for Fly.io builds
+# Force compiling Python if prebuilt extraction fails
+[tools]
+python = "3.12.6"
+
+[settings]
+python_compile = true
