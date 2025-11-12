@@ -1,0 +1,649 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block title %}{% if shift %}Edit{% else %}New{% endif %} Shift - Leos Investments{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'core/css/professional.css' %}">
+<style>
+    .form-container {
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: 2rem 1rem;
+    }
+    
+    .page-header {
+        margin-bottom: 2rem;
+        padding-bottom: 1rem;
+        border-bottom: 2px solid var(--border-light);
+    }
+    
+    .page-title {
+        font-size: 2rem;
+        font-weight: 700;
+        color: var(--leos-secondary);
+        margin: 0;
+    }
+    
+    .page-subtitle {
+        color: var(--text-secondary);
+        font-size: 1rem;
+        margin-top: 0.5rem;
+    }
+    
+    .form-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 1rem;
+    }
+    
+    .form-grid-2 {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+        gap: 1.5rem;
+    }
+    
+    .sticky-add-btn {
+        position: sticky;
+        top: 70px;
+        z-index: 8;
+        display: flex;
+        justify-content: flex-end;
+        padding: 0.75rem 1rem;
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(10px);
+        border-radius: var(--radius-sm);
+        margin-bottom: 0.5rem;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    
+    .field-hint {
+        font-size: 0.8rem;
+        color: var(--text-light);
+        margin-top: 0.25rem;
+    }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Auto-calculate meters drilled
+    const progressForms = document.querySelectorAll('[id^="id_progress-"][id$="-start_depth"]');
+    progressForms.forEach(function(startDepth) {
+        const row = startDepth.id.match(/id_progress-(\d+)/)[1];
+        const endDepth = document.getElementById(`id_progress-${row}-end_depth`);
+        const metersDrilled = document.getElementById(`id_progress-${row}-meters_drilled`);
+        
+        [startDepth, endDepth].forEach(field => {
+            field.addEventListener('change', function() {
+                if (startDepth.value && endDepth.value) {
+                    const meters = (parseFloat(endDepth.value) - parseFloat(startDepth.value)).toFixed(2);
+                    metersDrilled.value = meters;
+                    metersDrilled.style.background = '#D4EDDA';
+                    setTimeout(() => metersDrilled.style.background = '', 1000);
+                }
+            });
+        });
+    });
+    
+    // Standby field toggles
+    const standbyClientCheckbox = document.getElementById('id_standby_client');
+    const standbyClientReason = document.getElementById('id_standby_client_reason');
+    const standbyClientRemarks = document.getElementById('id_standby_client_remarks');
+    
+    const standbyConstructorCheckbox = document.getElementById('id_standby_constructor');
+    const standbyConstructorReason = document.getElementById('id_standby_constructor_reason');
+    const standbyConstructorRemarks = document.getElementById('id_standby_constructor_remarks');
+    
+    function toggleStandbyFields() {
+        if (standbyClientCheckbox) {
+            const isClientStandby = standbyClientCheckbox.checked;
+            standbyClientReason.disabled = !isClientStandby;
+            standbyClientRemarks.disabled = !isClientStandby;
+            standbyClientReason.closest('.pro-form-group').style.opacity = isClientStandby ? '1' : '0.5';
+            standbyClientRemarks.closest('.pro-form-group').style.opacity = isClientStandby ? '1' : '0.5';
+            if (!isClientStandby) {
+                standbyClientReason.value = '';
+                standbyClientRemarks.value = '';
+            }
+        }
+        
+        if (standbyConstructorCheckbox) {
+            const isConstructorStandby = standbyConstructorCheckbox.checked;
+            standbyConstructorReason.disabled = !isConstructorStandby;
+            standbyConstructorRemarks.disabled = !isConstructorStandby;
+            standbyConstructorReason.closest('.pro-form-group').style.opacity = isConstructorStandby ? '1' : '0.5';
+            standbyConstructorRemarks.closest('.pro-form-group').style.opacity = isConstructorStandby ? '1' : '0.5';
+            if (!isConstructorStandby) {
+                standbyConstructorReason.value = '';
+                standbyConstructorRemarks.value = '';
+            }
+        }
+    }
+    
+    toggleStandbyFields();
+    
+    if (standbyClientCheckbox) {
+        standbyClientCheckbox.addEventListener('change', toggleStandbyFields);
+    }
+    if (standbyConstructorCheckbox) {
+        standbyConstructorCheckbox.addEventListener('change', toggleStandbyFields);
+    }
+});
+
+// Add new inline form row using empty_form template
+function addForm(prefix) {
+    const totalInput = document.getElementById(`id_${prefix}-TOTAL_FORMS`);
+    const index = parseInt(totalInput.value, 10);
+    const tpl = document.getElementById(`${prefix}-empty-form`);
+    if (!tpl) { console.error('Empty form template not found for', prefix); return; }
+    const html = tpl.innerHTML.replace(/__prefix__/g, index);
+    if (prefix === 'progress') {
+        const tbody = document.querySelector('#progress-table tbody');
+        tbody.insertAdjacentHTML('beforeend', html);
+        // Wire up meters drilled auto-calc for this new row
+        const startDepth = document.getElementById(`id_progress-${index}-start_depth`);
+        const endDepth = document.getElementById(`id_progress-${index}-end_depth`);
+        const metersDrilled = document.getElementById(`id_progress-${index}-meters_drilled`);
+        [startDepth, endDepth].forEach(el => {
+            if (el) {
+                el.addEventListener('change', function() {
+                    if (startDepth.value && endDepth.value) {
+                        const meters = (parseFloat(endDepth.value) - parseFloat(startDepth.value)).toFixed(2);
+                        if (!isNaN(meters)) {
+                            metersDrilled.value = meters;
+                            metersDrilled.style.background = '#D4EDDA';
+                            setTimeout(() => metersDrilled.style.background = '', 1000);
+                        }
+                    }
+                });
+            }
+        });
+    } else if (prefix === 'survey') {
+        const tbody = document.querySelector('#survey-table tbody');
+        tbody.insertAdjacentHTML('beforeend', html);
+    } else if (prefix === 'casing') {
+        const tbody = document.querySelector('#casing-table tbody');
+        tbody.insertAdjacentHTML('beforeend', html);
+    } else if (prefix === 'material') {
+        const tbody = document.querySelector('#material-table tbody');
+        tbody.insertAdjacentHTML('beforeend', html);
+    } else if (prefix === 'activity') {
+        const container = document.getElementById('activity-forms');
+        container.insertAdjacentHTML('beforeend', html);
+    }
+    totalInput.value = index + 1;
+}
+
+</script>
+{% endblock %}
+
+{% block content %}
+<div class="form-container">
+    <div class="page-header">
+        <h1 class="page-title">{% if shift %}Edit Shift Report{% else %}New Shift Report{% endif %}</h1>
+        <p class="page-subtitle">Document daily drilling operations and progress</p>
+    </div>
+
+    {% if messages %}
+        {% for message in messages %}
+        <div class="pro-alert pro-alert-{{ message.tags }}">
+            {{ message }}
+        </div>
+        {% endfor %}
+    {% endif %}
+
+    <form method="post" enctype="multipart/form-data" class="needs-validation" novalidate>
+        {% csrf_token %}
+        
+        <!-- Basic Information -->
+        <div class="pro-card mb-4">
+            <div class="pro-card-header">
+                BASIC INFORMATION
+            </div>
+            <div class="pro-card-body">
+                <div class="form-grid">
+                    <div class="pro-form-group">
+                        <label for="{{ form.date.id_for_label }}" class="pro-label">{{ form.date.label }} *</label>
+                        {{ form.date }}
+                        {{ form.date.errors }}
+                    </div>
+                    <div class="pro-form-group">
+                        <label for="{{ form.shift_type.id_for_label }}" class="pro-label">{{ form.shift_type.label }} *</label>
+                        {{ form.shift_type }}
+                        {{ form.shift_type.errors }}
+                    </div>
+                    <div class="pro-form-group">
+                        <label for="{{ form.client.id_for_label }}" class="pro-label">{{ form.client.label }}</label>
+                        {{ form.client }}
+                        <div class="field-hint">Select client/company for this project</div>
+                        {{ form.client.errors }}
+                    </div>
+                    <div class="pro-form-group">
+                        <label for="{{ form.rig.id_for_label }}" class="pro-label">{{ form.rig.label }}</label>
+                        {{ form.rig }}
+                        <div class="field-hint">Rig name or identifier</div>
+                        {{ form.rig.errors }}
+                    </div>
+                    <div class="pro-form-group">
+                        <label for="{{ form.location.id_for_label }}" class="pro-label">{{ form.location.label }}</label>
+                        {{ form.location }}
+                        <div class="field-hint">Site or project location</div>
+                        {{ form.location.errors }}
+                    </div>
+                    <div class="pro-form-group">
+                        <label for="{{ form.supervisor_name.id_for_label }}" class="pro-label">{{ form.supervisor_name.label }}</label>
+                        {{ form.supervisor_name }}
+                        {{ form.supervisor_name.errors }}
+                    </div>
+                    <div class="pro-form-group">
+                        <label for="{{ form.driller_name.id_for_label }}" class="pro-label">{{ form.driller_name.label }}</label>
+                        {{ form.driller_name }}
+                        {{ form.driller_name.errors }}
+                    </div>
+                    <div class="pro-form-group">
+                        <label for="{{ form.start_time.id_for_label }}" class="pro-label">{{ form.start_time.label }}</label>
+                        {{ form.start_time }}
+                        {{ form.start_time.errors }}
+                    </div>
+                    <div class="pro-form-group">
+                        <label for="{{ form.end_time.id_for_label }}" class="pro-label">{{ form.end_time.label }}</label>
+                        {{ form.end_time }}
+                        {{ form.end_time.errors }}
+                    </div>
+                </div>
+                
+                <div class="form-grid mt-3">
+                    <div class="pro-form-group">
+                        <label for="{{ form.helper1_name.id_for_label }}" class="pro-label">{{ form.helper1_name.label }}</label>
+                        {{ form.helper1_name }}
+                    </div>
+                    <div class="pro-form-group">
+                        <label for="{{ form.helper2_name.id_for_label }}" class="pro-label">{{ form.helper2_name.label }}</label>
+                        {{ form.helper2_name }}
+                    </div>
+                    <div class="pro-form-group">
+                        <label for="{{ form.helper3_name.id_for_label }}" class="pro-label">{{ form.helper3_name.label }}</label>
+                        {{ form.helper3_name }}
+                    </div>
+                    <div class="pro-form-group">
+                        <label for="{{ form.helper4_name.id_for_label }}" class="pro-label">{{ form.helper4_name.label }}</label>
+                        {{ form.helper4_name }}
+                    </div>
+                </div>
+                
+                <div class="pro-form-group mt-3">
+                    <label for="{{ form.notes.id_for_label }}" class="pro-label">{{ form.notes.label }}</label>
+                    {{ form.notes }}
+                    <div class="field-hint">General notes or observations for this shift</div>
+                    {{ form.notes.errors }}
+                </div>
+            </div>
+        </div>
+
+        <!-- Standby Information -->
+        <div class="form-grid-2 mb-4">
+            <div class="pro-card">
+                <div class="pro-card-header" style="background: linear-gradient(135deg, #F39C12 0%, #E67E22 100%);">
+                    CLIENT STANDBY
+                </div>
+                <div class="pro-card-body">
+                    <div class="pro-form-group">
+                        <div class="form-check">
+                            {{ form.standby_client }}
+                            <label class="form-check-label" for="{{ form.standby_client.id_for_label }}">
+                                <strong>Standby due to client reasons</strong>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="pro-form-group">
+                        <label for="{{ form.standby_client_reason.id_for_label }}" class="pro-label">Reason</label>
+                        {{ form.standby_client_reason }}
+                        {{ form.standby_client_reason.errors }}
+                    </div>
+                    <div class="pro-form-group">
+                        <label for="{{ form.standby_client_remarks.id_for_label }}" class="pro-label">Remarks</label>
+                        {{ form.standby_client_remarks }}
+                        {{ form.standby_client_remarks.errors }}
+                    </div>
+                </div>
+            </div>
+            
+            <div class="pro-card">
+                <div class="pro-card-header" style="background: linear-gradient(135deg, #3498DB 0%, #2980B9 100%);">
+                    CONSTRUCTOR STANDBY
+                </div>
+                <div class="pro-card-body">
+                    <div class="pro-form-group">
+                        <div class="form-check">
+                            {{ form.standby_constructor }}
+                            <label class="form-check-label" for="{{ form.standby_constructor.id_for_label }}">
+                                <strong>Standby due to constructor reasons</strong>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="pro-form-group">
+                        <label for="{{ form.standby_constructor_reason.id_for_label }}" class="pro-label">Reason</label>
+                        {{ form.standby_constructor_reason }}
+                        {{ form.standby_constructor_reason.errors }}
+                    </div>
+                    <div class="pro-form-group">
+                        <label for="{{ form.standby_constructor_remarks.id_for_label }}" class="pro-label">Remarks</label>
+                        {{ form.standby_constructor_remarks }}
+                        {{ form.standby_constructor_remarks.errors }}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Drilling Progress -->
+        <div class="pro-card mb-4">
+            <div class="pro-table-container">
+                <div class="pro-table-header">
+                    <span class="pro-table-title">DRILLING PROGRESS</span>
+                    <button type="button" class="btn-pro-add" onclick="addForm('progress')">
+                        + Add Run
+                    </button>
+                </div>
+                {{ progress_formset.management_form }}
+                {% if progress_formset.non_form_errors %}
+                <div class="pro-alert pro-alert-error">
+                    {% for err in progress_formset.non_form_errors %}<div>{{ err }}</div>{% endfor %}
+                </div>
+                {% endif %}
+                <div class="pro-table-wrapper">
+                    <table class="pro-table" id="progress-table">
+                        <thead>
+                            <tr>
+                                <th>Hole #</th>
+                                <th>Size</th>
+                                <th>Start (m)</th>
+                                <th>End (m)</th>
+                                <th>Meters</th>
+                                <th>Loss (m)</th>
+                                <th>Gain (m)</th>
+                                <th>Start Time</th>
+                                <th>End Time</th>
+                                <th>Core Tray Image</th>
+                                <th>Remarks</th>
+                                <th>Del</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for form in progress_formset %}
+                            <tr class="progress-form">
+                                {{ form.id }}
+                                <td>{{ form.hole_number }}</td>
+                                <td>{{ form.size }}</td>
+                                <td>{{ form.start_depth }}</td>
+                                <td>{{ form.end_depth }}</td>
+                                <td>{{ form.meters_drilled }}</td>
+                                <td>{{ form.core_loss }}</td>
+                                <td>{{ form.core_gain }}</td>
+                                <td>{{ form.start_time }}</td>
+                                <td>{{ form.end_time }}</td>
+                                <td>
+                                    {{ form.core_tray_image }}
+                                    {% if form.instance.core_tray_image %}
+                                    <small class="text-success d-block">✓ Image uploaded</small>
+                                    {% endif %}
+                                </td>
+                                <td>{{ form.remarks }}</td>
+                                <td><div class="form-check">{{ form.DELETE }}</div></td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Activities, Surveys, Materials, Casing in compact cards -->
+        <div class="row g-4 mb-4">
+            <!-- Activities -->
+            <div class="col-md-12">
+                <div class="pro-card">
+                    <div class="pro-table-container">
+                        <div class="pro-table-header">
+                            <span class="pro-table-title">ACTIVITIES & EVENTS</span>
+                            <button type="button" class="btn-pro-add" onclick="addForm('activity')">
+                                + Add Activity
+                            </button>
+                        </div>
+                        {{ activity_formset.management_form }}
+                        <div class="pro-card-body">
+                            <div id="activity-forms">
+                                {% for form in activity_formset %}
+                                <div class="activity-form row g-3 mb-3 p-3" style="background: #F8F9FA; border-radius: 8px;">
+                                    {{ form.id }}
+                                    <div class="col-md-2">
+                                        <label class="pro-label">Type</label>
+                                        {{ form.activity_type }}
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="pro-label">Description</label>
+                                        {{ form.description }}
+                                    </div>
+                                    <div class="col-md-2">
+                                        <label class="pro-label">Duration</label>
+                                        <div class="d-flex align-items-center">
+                                            {{ form.duration_minutes }}
+                                            <select name="activity-{{ forloop.counter0 }}-duration_unit" class="form-select ms-2" style="width: 80px; font-size: 0.85rem;">
+                                                <option value="minutes">min</option>
+                                                <option value="hours">hr</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="pro-label">Performed By</label>
+                                        {{ form.performed_by }}
+                                    </div>
+                                    <div class="col-md-1">
+                                        <label class="pro-label">Delete</label>
+                                        <div class="form-check mt-2">{{ form.DELETE }}</div>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Materials, Surveys, Casing in grid -->
+        <div class="row g-4 mb-4">
+            <div class="col-md-4">
+                <div class="pro-card h-100">
+                    <div class="pro-card-header">MATERIALS USED</div>
+                    <div class="pro-card-body">
+                        <button type="button" class="btn-pro-add mb-3" onclick="addForm('material')">+ Add Material</button>
+                        {{ material_formset.management_form }}
+                        <div class="pro-table-wrapper" style="max-height: 400px;">
+                            <table class="pro-table" id="material-table">
+                                <thead>
+                                    <tr>
+                                        <th>Material</th>
+                                        <th>Qty</th>
+                                        <th>Unit</th>
+                                        <th>Del</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for form in material_formset %}
+                                    <tr class="material-form">
+                                        {{ form.id }}
+                                        <td>{{ form.material_name }}</td>
+                                        <td>{{ form.quantity }}</td>
+                                        <td>{{ form.unit }}</td>
+                                        <td><div class="form-check">{{ form.DELETE }}</div></td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-4">
+                <div class="pro-card h-100">
+                    <div class="pro-card-header">SURVEYS</div>
+                    <div class="pro-card-body">
+                        <button type="button" class="btn-pro-add mb-3" onclick="addForm('survey')">+ Add Survey</button>
+                        {{ survey_formset.management_form }}
+                        <div class="pro-table-wrapper" style="max-height: 400px;">
+                            <table class="pro-table" id="survey-table">
+                                <thead>
+                                    <tr>
+                                        <th>Type</th>
+                                        <th>Depth</th>
+                                        <th>Dip</th>
+                                        <th>Del</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for form in survey_formset %}
+                                    <tr class="survey-form">
+                                        {{ form.id }}
+                                        <td>{{ form.survey_type }}</td>
+                                        <td>{{ form.depth }}</td>
+                                        <td>{{ form.dip_angle }}</td>
+                                        <td><div class="form-check">{{ form.DELETE }}</div></td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-4">
+                <div class="pro-card h-100">
+                    <div class="pro-card-header">CASING</div>
+                    <div class="pro-card-body">
+                        <button type="button" class="btn-pro-add mb-3" onclick="addForm('casing')">+ Add Casing</button>
+                        {{ casing_formset.management_form }}
+                        <div class="pro-table-wrapper" style="max-height: 400px;">
+                            <table class="pro-table" id="casing-table">
+                                <thead>
+                                    <tr>
+                                        <th>Size</th>
+                                        <th>Type</th>
+                                        <th>Length</th>
+                                        <th>Del</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for form in casing_formset %}
+                                    <tr class="casing-form">
+                                        {{ form.id }}
+                                        <td>{{ form.casing_size }}</td>
+                                        <td>{{ form.casing_type }}</td>
+                                        <td>{{ form.length }}</td>
+                                        <td><div class="form-check">{{ form.DELETE }}</div></td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Form Actions -->
+        <div class="d-flex justify-content-between align-items-center mt-4">
+            <a href="{% if shift %}{% url 'core:shift_detail' shift.pk %}{% else %}{% url 'core:shift_list' %}{% endif %}" 
+               class="btn-pro-secondary">
+                Cancel
+            </a>
+            <button type="submit" class="btn-pro-primary">
+                SAVE SHIFT REPORT
+            </button>
+        </div>
+    </form>
+</div>
+
+<!-- Empty templates for dynamic add -->
+<template id="progress-empty-form">
+    <tr class="progress-form">
+        {{ progress_formset.empty_form.id }}
+        <td>{{ progress_formset.empty_form.hole_number }}</td>
+        <td>{{ progress_formset.empty_form.size }}</td>
+        <td>{{ progress_formset.empty_form.start_depth }}</td>
+        <td>{{ progress_formset.empty_form.end_depth }}</td>
+        <td>{{ progress_formset.empty_form.meters_drilled }}</td>
+        <td>{{ progress_formset.empty_form.core_loss }}</td>
+        <td>{{ progress_formset.empty_form.core_gain }}</td>
+        <td>{{ progress_formset.empty_form.start_time }}</td>
+        <td>{{ progress_formset.empty_form.end_time }}</td>
+        <td>{{ progress_formset.empty_form.remarks }}</td>
+        <td><div class="form-check">{{ progress_formset.empty_form.DELETE }}</div></td>
+    </tr>
+</template>
+
+<template id="activity-empty-form">
+    <div class="activity-form row g-3 mb-3 p-3" style="background: #F8F9FA; border-radius: 8px;">
+        {{ activity_formset.empty_form.id }}
+        <div class="col-md-2">
+            <label class="pro-label">Type</label>
+            {{ activity_formset.empty_form.activity_type }}
+        </div>
+        <div class="col-md-4">
+            <label class="pro-label">Description</label>
+            {{ activity_formset.empty_form.description }}
+        </div>
+        <div class="col-md-2">
+            <label class="pro-label">Duration</label>
+            <div class="d-flex align-items-center">
+                {{ activity_formset.empty_form.duration_minutes }}
+                <select name="activity-__prefix__-duration_unit" class="form-select ms-2" style="width: 80px; font-size: 0.85rem;">
+                    <option value="minutes">min</option>
+                    <option value="hours">hr</option>
+                </select>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <label class="pro-label">Performed By</label>
+            {{ activity_formset.empty_form.performed_by }}
+        </div>
+        <div class="col-md-1">
+            <label class="pro-label">Delete</label>
+            <div class="form-check mt-2">{{ activity_formset.empty_form.DELETE }}</div>
+        </div>
+    </div>
+</template>
+
+<template id="material-empty-form">
+    <tr class="material-form">
+        {{ material_formset.empty_form.id }}
+        <td>{{ material_formset.empty_form.material_name }}</td>
+        <td>{{ material_formset.empty_form.quantity }}</td>
+        <td>{{ material_formset.empty_form.unit }}</td>
+        <td><div class="form-check">{{ material_formset.empty_form.DELETE }}</div></td>
+    </tr>
+</template>
+
+<template id="survey-empty-form">
+    <tr class="survey-form">
+        {{ survey_formset.empty_form.id }}
+        <td>{{ survey_formset.empty_form.survey_type }}</td>
+        <td>{{ survey_formset.empty_form.depth }}</td>
+        <td>{{ survey_formset.empty_form.dip_angle }}</td>
+        <td><div class="form-check">{{ survey_formset.empty_form.DELETE }}</div></td>
+    </tr>
+</template>
+
+<template id="casing-empty-form">
+    <tr class="casing-form">
+        {{ casing_formset.empty_form.id }}
+        <td>{{ casing_formset.empty_form.casing_size }}</td>
+        <td>{{ casing_formset.empty_form.casing_type }}</td>
+        <td>{{ casing_formset.empty_form.length }}</td>
+        <td><div class="form-check">{{ casing_formset.empty_form.DELETE }}</div></td>
+    </tr>
+</template>
+{% endblock %}

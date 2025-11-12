@@ -1,0 +1,571 @@
+{% extends 'core/base.html' %}
+
+{% block title %}{% if shift %}Edit{% else %}New{% endif %} Shift - Mini-Krux{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Auto-calculate meters drilled
+    const progressForms = document.querySelectorAll('[id^="id_progress-"][id$="-start_depth"]');
+    progressForms.forEach(function(startDepth) {
+        const row = startDepth.id.match(/id_progress-(\d+)/)[1];
+        const endDepth = document.getElementById(`id_progress-${row}-end_depth`);
+        const metersDrilled = document.getElementById(`id_progress-${row}-meters_drilled`);
+        
+        [startDepth, endDepth].forEach(field => {
+            field.addEventListener('change', function() {
+                if (startDepth.value && endDepth.value) {
+                    const meters = (parseFloat(endDepth.value) - parseFloat(startDepth.value)).toFixed(2);
+                    metersDrilled.value = meters;
+                }
+            });
+        });
+    });
+    
+    // Standby field toggles
+    const standbyClientCheckbox = document.getElementById('id_standby_client');
+    const standbyClientReason = document.getElementById('id_standby_client_reason');
+    const standbyClientRemarks = document.getElementById('id_standby_client_remarks');
+    
+    const standbyConstructorCheckbox = document.getElementById('id_standby_constructor');
+    const standbyConstructorReason = document.getElementById('id_standby_constructor_reason');
+    const standbyConstructorRemarks = document.getElementById('id_standby_constructor_remarks');
+    
+    function toggleStandbyFields() {
+        // Client standby
+        if (standbyClientCheckbox) {
+            const isClientStandby = standbyClientCheckbox.checked;
+            standbyClientReason.disabled = !isClientStandby;
+            standbyClientRemarks.disabled = !isClientStandby;
+            if (!isClientStandby) {
+                standbyClientReason.value = '';
+                standbyClientRemarks.value = '';
+            }
+        }
+        
+        // Constructor standby
+        if (standbyConstructorCheckbox) {
+            const isConstructorStandby = standbyConstructorCheckbox.checked;
+            standbyConstructorReason.disabled = !isConstructorStandby;
+            standbyConstructorRemarks.disabled = !isConstructorStandby;
+            if (!isConstructorStandby) {
+                standbyConstructorReason.value = '';
+                standbyConstructorRemarks.value = '';
+            }
+        }
+    }
+    
+    // Initial state
+    toggleStandbyFields();
+    
+    // Event listeners
+    if (standbyClientCheckbox) {
+        standbyClientCheckbox.addEventListener('change', toggleStandbyFields);
+    }
+    if (standbyConstructorCheckbox) {
+        standbyConstructorCheckbox.addEventListener('change', toggleStandbyFields);
+    }
+});
+
+// Add new inline form row using empty_form template
+function addForm(prefix) {
+    const totalInput = document.getElementById(`id_${prefix}-TOTAL_FORMS`);
+    const index = parseInt(totalInput.value, 10);
+    const tpl = document.getElementById(`${prefix}-empty-form`);
+    if (!tpl) { console.error('Empty form template not found for', prefix); return; }
+    const html = tpl.innerHTML.replace(/__prefix__/g, index);
+    if (prefix === 'progress') {
+        const tbody = document.querySelector('#progress-table tbody');
+        tbody.insertAdjacentHTML('beforeend', html);
+        // Wire up meters drilled auto-calc for this new row
+        const startDepth = document.getElementById(`id_progress-${index}-start_depth`);
+        const endDepth = document.getElementById(`id_progress-${index}-end_depth`);
+        const metersDrilled = document.getElementById(`id_progress-${index}-meters_drilled`);
+        [startDepth, endDepth].forEach(el => {
+            if (el) {
+                el.addEventListener('change', function() {
+                    if (startDepth.value && endDepth.value) {
+                        const meters = (parseFloat(endDepth.value) - parseFloat(startDepth.value)).toFixed(2);
+                        if (!isNaN(meters)) metersDrilled.value = meters;
+                    }
+                });
+            }
+        });
+    } else if (prefix === 'survey') {
+        const tbody = document.querySelector('#survey-table tbody');
+        tbody.insertAdjacentHTML('beforeend', html);
+    } else if (prefix === 'casing') {
+        const tbody = document.querySelector('#casing-table tbody');
+        tbody.insertAdjacentHTML('beforeend', html);
+    } else if (prefix === 'material') {
+        const tbody = document.querySelector('#material-table tbody');
+        tbody.insertAdjacentHTML('beforeend', html);
+    } else if (prefix === 'activity') {
+        const container = document.getElementById('activity-forms');
+        container.insertAdjacentHTML('beforeend', html);
+    }
+    totalInput.value = index + 1;
+}
+
+</script>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>{% if shift %}Edit{% else %}New{% endif %} Shift</h2>
+</div>
+
+<form method="post" class="needs-validation" novalidate>
+    {% csrf_token %}
+    
+    <!-- Basic Info -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="card-title mb-0">Basic Information</h5>
+        </div>
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label for="{{ form.date.id_for_label }}" class="form-label">{{ form.date.label }}</label>
+                    {{ form.date.errors }}
+                    {{ form.date }}
+                </div>
+                <div class="col-md-6">
+                    <label for="{{ form.shift_type.id_for_label }}" class="form-label">{{ form.shift_type.label }}</label>
+                    {{ form.shift_type.errors }}
+                    {{ form.shift_type }}
+                </div>
+                <div class="col-md-6">
+                    <label for="{{ form.client.id_for_label }}" class="form-label">{{ form.client.label }}</label>
+                    {{ form.client.errors }}
+                    {{ form.client }}
+                </div>
+                <div class="col-md-6">
+                    <label for="{{ form.rig.id_for_label }}" class="form-label">{{ form.rig.label }}</label>
+                    {{ form.rig.errors }}
+                    {{ form.rig }}
+                </div>
+                <div class="col-md-6">
+                    <label for="{{ form.location.id_for_label }}" class="form-label">{{ form.location.label }}</label>
+                    {{ form.location.errors }}
+                    {{ form.location }}
+                </div>
+                <div class="col-md-6">
+                    <label for="{{ form.supervisor_name.id_for_label }}" class="form-label">{{ form.supervisor_name.label }}</label>
+                    {{ form.supervisor_name.errors }}
+                    {{ form.supervisor_name }}
+                </div>
+                <div class="col-md-6">
+                    <label for="{{ form.driller_name.id_for_label }}" class="form-label">{{ form.driller_name.label }}</label>
+                    {{ form.driller_name.errors }}
+                    {{ form.driller_name }}
+                </div>
+                <div class="col-md-6">
+                    <label for="{{ form.helper1_name.id_for_label }}" class="form-label">{{ form.helper1_name.label }}</label>
+                    {{ form.helper1_name.errors }}
+                    {{ form.helper1_name }}
+                </div>
+                <div class="col-md-6">
+                    <label for="{{ form.helper2_name.id_for_label }}" class="form-label">{{ form.helper2_name.label }}</label>
+                    {{ form.helper2_name.errors }}
+                    {{ form.helper2_name }}
+                </div>
+                <div class="col-md-6">
+                    <label for="{{ form.helper3_name.id_for_label }}" class="form-label">{{ form.helper3_name.label }}</label>
+                    {{ form.helper3_name.errors }}
+                    {{ form.helper3_name }}
+                </div>
+                <div class="col-md-6">
+                    <label for="{{ form.helper4_name.id_for_label }}" class="form-label">{{ form.helper4_name.label }}</label>
+                    {{ form.helper4_name.errors }}
+                    {{ form.helper4_name }}
+                </div>
+                <div class="col-md-6">
+                    <label for="{{ form.start_time.id_for_label }}" class="form-label">{{ form.start_time.label }}</label>
+                    {{ form.start_time.errors }}
+                    {{ form.start_time }}
+                </div>
+                <div class="col-md-6">
+                    <label for="{{ form.end_time.id_for_label }}" class="form-label">{{ form.end_time.label }}</label>
+                    {{ form.end_time.errors }}
+                    {{ form.end_time }}
+                </div>
+                <div class="col-12">
+                    <label for="{{ form.notes.id_for_label }}" class="form-label">{{ form.notes.label }}</label>
+                    {{ form.notes.errors }}
+                    {{ form.notes }}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Standby Information -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="card-title mb-0">Standby Information</h5>
+        </div>
+        <div class="card-body">
+            <div class="row g-3">
+                <!-- Client Standby -->
+                <div class="col-12">
+                    <div class="card border-warning">
+                        <div class="card-body">
+                            <h6 class="card-subtitle mb-3 text-warning">
+                                <i class="bi bi-person-badge"></i> Standby - Client
+                            </h6>
+                            <div class="row g-3">
+                                <div class="col-md-12">
+                                    <div class="form-check">
+                                        {{ form.standby_client }}
+                                        <label class="form-check-label" for="{{ form.standby_client.id_for_label }}">
+                                            Standby due to client reasons
+                                        </label>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="{{ form.standby_client_reason.id_for_label }}" class="form-label">Reason</label>
+                                    {{ form.standby_client_reason.errors }}
+                                    {{ form.standby_client_reason }}
+                                </div>
+                                <div class="col-md-12">
+                                    <label for="{{ form.standby_client_remarks.id_for_label }}" class="form-label">Remarks</label>
+                                    {{ form.standby_client_remarks.errors }}
+                                    {{ form.standby_client_remarks }}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Constructor Standby -->
+                <div class="col-12">
+                    <div class="card border-info">
+                        <div class="card-body">
+                            <h6 class="card-subtitle mb-3 text-info">
+                                <i class="bi bi-tools"></i> Standby - Constructor (Us)
+                            </h6>
+                            <div class="row g-3">
+                                <div class="col-md-12">
+                                    <div class="form-check">
+                                        {{ form.standby_constructor }}
+                                        <label class="form-check-label" for="{{ form.standby_constructor.id_for_label }}">
+                                            Standby due to constructor reasons
+                                        </label>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="{{ form.standby_constructor_reason.id_for_label }}" class="form-label">Reason</label>
+                                    {{ form.standby_constructor_reason.errors }}
+                                    {{ form.standby_constructor_reason }}
+                                </div>
+                                <div class="col-md-12">
+                                    <label for="{{ form.standby_constructor_remarks.id_for_label }}" class="form-label">Remarks</label>
+                                    {{ form.standby_constructor_remarks.errors }}
+                                    {{ form.standby_constructor_remarks }}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Drilling Progress -->
+    <div class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="card-title mb-0">Drilling Progress</h5>
+            <button type="button" class="btn btn-sm btn-outline-primary" 
+                    onclick="addForm('progress')">Add Row</button>
+        </div>
+        <div class="card-body">
+            {{ progress_formset.management_form }}
+            {% if progress_formset.non_form_errors %}
+            <div class="alert alert-danger py-2">
+                {% for err in progress_formset.non_form_errors %}<div>{{ err }}</div>{% endfor %}
+            </div>
+            {% endif %}
+            <div class="table-responsive">
+                <table class="table table-sm" id="progress-table">
+                    <thead>
+                        <tr>
+                            <th>Hole #</th>
+                            <th>Size</th>
+                            <th>Start Depth (m)</th>
+                            <th>End Depth (m)</th>
+                            <th>Meters Drilled</th>
+                            <th>Core Loss (m)</th>
+                            <th>Core Gain (m)</th>
+                            <th>Start Time</th>
+                            <th>End Time</th>
+                            <th>Remarks</th>
+                            <th>Delete</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for form in progress_formset %}
+                        <tr class="progress-form">
+                            {{ form.id }}
+                            <td>{{ form.hole_number }}</td>
+                            <td>{{ form.size }}</td>
+                            <td>{{ form.start_depth }}</td>
+                            <td>{{ form.end_depth }}</td>
+                            <td>{{ form.meters_drilled }}</td>
+                            <td>{{ form.core_loss }}</td>
+                            <td>{{ form.core_gain }}</td>
+                            <td>{{ form.start_time }}</td>
+                            <td>{{ form.end_time }}</td>
+                            <td>{{ form.remarks }}</td>
+                            <td>
+                                <div class="form-check">
+                                    {{ form.DELETE }}
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Empty templates for dynamic add -->
+    <template id="progress-empty-form">
+        <tr class="progress-form">
+            {{ progress_formset.empty_form.id }}
+            <td>{{ progress_formset.empty_form.hole_number }}</td>
+            <td>{{ progress_formset.empty_form.size }}</td>
+            <td>{{ progress_formset.empty_form.start_depth }}</td>
+            <td>{{ progress_formset.empty_form.end_depth }}</td>
+            <td>{{ progress_formset.empty_form.meters_drilled }}</td>
+            <td>{{ progress_formset.empty_form.core_loss }}</td>
+            <td>{{ progress_formset.empty_form.core_gain }}</td>
+            <td>{{ progress_formset.empty_form.start_time }}</td>
+            <td>{{ progress_formset.empty_form.end_time }}</td>
+            <td>{{ progress_formset.empty_form.remarks }}</td>
+            <td><div class="form-check">{{ progress_formset.empty_form.DELETE }}</div></td>
+        </tr>
+    </template>
+    <template id="activity-empty-form">
+            <div class="activity-form row g-3 mb-3">
+                {{ activity_formset.empty_form.id }}
+                <div class="col-md-2">{{ activity_formset.empty_form.activity_type }}</div>
+                <div class="col-md-4">{{ activity_formset.empty_form.description }}</div>
+                <div class="col-md-2 d-flex align-items-center">
+                    {{ activity_formset.empty_form.duration_minutes }}
+                    <select name="activity-__prefix__-duration_unit" class="form-select ms-2" style="width: 80px;">
+                        <option value="minutes">min</option>
+                        <option value="hours">hr</option>
+                    </select>
+                </div>
+                <div class="col-md-3">{{ activity_formset.empty_form.performed_by }}</div>
+                <div class="col-md-1"><div class="form-check mt-2">{{ activity_formset.empty_form.DELETE }}</div></div>
+            </div>
+    </template>
+    <template id="material-empty-form">
+        <tr class="material-form">
+            {{ material_formset.empty_form.id }}
+            <td>{{ material_formset.empty_form.material_name }}</td>
+            <td>{{ material_formset.empty_form.quantity }}</td>
+            <td>{{ material_formset.empty_form.unit }}</td>
+            <td>{{ material_formset.empty_form.remarks }}</td>
+            <td><div class="form-check">{{ material_formset.empty_form.DELETE }}</div></td>
+        </tr>
+    </template>
+    <template id="survey-empty-form">
+        <tr class="survey-form">
+            {{ survey_formset.empty_form.id }}
+            <td>{{ survey_formset.empty_form.survey_type }}</td>
+            <td>{{ survey_formset.empty_form.depth }}</td>
+            <td>{{ survey_formset.empty_form.dip_angle }}</td>
+            <td>{{ survey_formset.empty_form.azimuth }}</td>
+            <td>{{ survey_formset.empty_form.findings }}</td>
+            <td>{{ survey_formset.empty_form.surveyor_name }}</td>
+            <td><div class="form-check">{{ survey_formset.empty_form.DELETE }}</div></td>
+        </tr>
+    </template>
+    <template id="casing-empty-form">
+        <tr class="casing-form">
+            {{ casing_formset.empty_form.id }}
+            <td>{{ casing_formset.empty_form.casing_size }}</td>
+            <td>{{ casing_formset.empty_form.casing_type }}</td>
+            <td>{{ casing_formset.empty_form.start_depth }}</td>
+            <td>{{ casing_formset.empty_form.end_depth }}</td>
+            <td>{{ casing_formset.empty_form.length }}</td>
+            <td>{{ casing_formset.empty_form.remarks }}</td>
+            <td><div class="form-check">{{ casing_formset.empty_form.DELETE }}</div></td>
+        </tr>
+    </template>
+
+    <!-- Surveys (after drilling runs) -->
+    <div class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="card-title mb-0">Surveys (Camera/Downhole)</h5>
+            <button type="button" class="btn btn-sm btn-outline-primary" 
+                    onclick="addForm('survey')">Add Survey</button>
+        </div>
+        <div class="card-body">
+            {{ survey_formset.management_form }}
+            <div class="table-responsive">
+                <table class="table table-sm" id="survey-table">
+                    <thead>
+                        <tr>
+                            <th>Survey Type</th>
+                            <th>Depth (m)</th>
+                            <th>Dip Angle (°)</th>
+                            <th>Azimuth (°)</th>
+                            <th>Findings/Notes</th>
+                            <th>Surveyor Name</th>
+                            <th>Delete</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for form in survey_formset %}
+                        <tr class="survey-form">
+                            {{ form.id }}
+                            <td>{{ form.survey_type }}</td>
+                            <td>{{ form.depth }}</td>
+                            <td>{{ form.dip_angle }}</td>
+                            <td>{{ form.azimuth }}</td>
+                            <td>{{ form.findings }}</td>
+                            <td>{{ form.surveyor_name }}</td>
+                            <td>
+                                <div class="form-check">
+                                    {{ form.DELETE }}
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Casing -->
+    <div class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="card-title mb-0">Casing Installation</h5>
+            <button type="button" class="btn btn-sm btn-outline-primary" 
+                    onclick="addForm('casing')">Add Casing</button>
+        </div>
+        <div class="card-body">
+            {{ casing_formset.management_form }}
+            <div class="table-responsive">
+                <table class="table table-sm" id="casing-table">
+                    <thead>
+                        <tr>
+                            <th>Size</th>
+                            <th>Type</th>
+                            <th>Start Depth (m)</th>
+                            <th>End Depth (m)</th>
+                            <th>Length (m)</th>
+                            <th>Remarks</th>
+                            <th>Delete</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for form in casing_formset %}
+                        <tr class="casing-form">
+                            {{ form.id }}
+                            <td>{{ form.casing_size }}</td>
+                            <td>{{ form.casing_type }}</td>
+                            <td>{{ form.start_depth }}</td>
+                            <td>{{ form.end_depth }}</td>
+                            <td>{{ form.length }}</td>
+                            <td>{{ form.remarks }}</td>
+                            <td>
+                                <div class="form-check">
+                                    {{ form.DELETE }}
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Activities -->
+    <div class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="card-title mb-0">Activities</h5>
+            <button type="button" class="btn btn-sm btn-outline-primary" 
+                    onclick="addForm('activity')">Add Activity</button>
+        </div>
+        <div class="card-body">
+            {{ activity_formset.management_form }}
+            <div id="activity-forms">
+                {% for form in activity_formset %}
+                    <div class="activity-form row g-3 mb-3">
+                        {{ form.id }}
+                        <div class="col-md-2">{{ form.activity_type }}</div>
+                        <div class="col-md-4">{{ form.description }}</div>
+                        <div class="col-md-2 d-flex align-items-center">
+                            {{ form.duration_minutes }}
+                            <select name="activity-{{ forloop.counter0 }}-duration_unit" class="form-select ms-2" style="width: 80px;">
+                                <option value="minutes">min</option>
+                                <option value="hours">hr</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">{{ form.performed_by }}</div>
+                        <div class="col-md-1">
+                            <div class="form-check mt-2">
+                                {{ form.DELETE }}
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Materials -->
+    <div class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="card-title mb-0">Materials Used</h5>
+            <button type="button" class="btn btn-sm btn-outline-primary" 
+                    onclick="addForm('material')">Add Material</button>
+        </div>
+        <div class="card-body">
+            {{ material_formset.management_form }}
+            <div class="table-responsive">
+                <table class="table table-sm" id="material-table">
+                    <thead>
+                        <tr>
+                            <th>Material</th>
+                            <th>Quantity</th>
+                            <th>Unit</th>
+                            <th>Remarks</th>
+                            <th>Delete</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for form in material_formset %}
+                        <tr class="material-form">
+                            {{ form.id }}
+                            <td>{{ form.material_name }}</td>
+                            <td>{{ form.quantity }}</td>
+                            <td>{{ form.unit }}</td>
+                            <td>{{ form.remarks }}</td>
+                            <td>
+                                <div class="form-check">
+                                    {{ form.DELETE }}
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+        <a href="{% if shift %}{% url 'core:shift_detail' shift.pk %}{% else %}{% url 'core:shift_list' %}{% endif %}" 
+           class="btn btn-secondary me-md-2">Cancel</a>
+        <button type="submit" class="btn btn-primary">Save Shift</button>
+    </div>
+</form>
+{% endblock %}

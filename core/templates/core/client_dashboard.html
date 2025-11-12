@@ -1,0 +1,306 @@
+{% extends 'core/base.html' %}
+
+{% block title %}Client Dashboard - {{ client.name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Success/Error Messages -->
+    {% if messages %}
+    <div class="row mb-3">
+        <div class="col-12">
+            {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                <strong>
+                    {% if message.tags == 'success' %}✓{% elif message.tags == 'error' %}✗{% else %}ℹ{% endif %}
+                </strong>
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2>{{ client.name }} - Daily Shift Reports</h2>
+            <p class="text-muted mb-0">Review and approve your shift reports</p>
+        </div>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body text-center">
+                    <h6 class="text-muted mb-2">Pending Approval</h6>
+                    <h2 class="display-6 mb-0 text-warning">{{ pending_count }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body text-center">
+                    <h6 class="text-muted mb-2">Approved</h6>
+                    <h2 class="display-6 mb-0 text-success">{{ approved_count }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body text-center">
+                    <h6 class="text-muted mb-2">Rejected</h6>
+                    <h2 class="display-6 mb-0 text-danger">{{ rejected_count }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body text-center">
+                    <h6 class="text-muted mb-2">Total Shifts</h6>
+                    <h2 class="display-6 mb-0">{{ total_shifts }}</h2>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="card mb-4 border-0 shadow-sm">
+        <div class="card-body">
+            <form method="get" class="row g-3">
+                <div class="col-md-3">
+                    <label class="form-label">Status</label>
+                    <select name="client_status" class="form-select">
+                        <option value="">All Statuses</option>
+                        {% for value, label in client_status_choices %}
+                        <option value="{{ value }}" {% if request.GET.client_status == value %}selected{% endif %}>
+                            {{ label }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Start Date</label>
+                    <input type="date" name="start_date" class="form-control" value="{{ request.GET.start_date }}">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">End Date</label>
+                    <input type="date" name="end_date" class="form-control" value="{{ request.GET.end_date }}">
+                </div>
+                <div class="col-md-3 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="bi bi-funnel"></i> Filter
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Shifts Table -->
+    <div class="card border-0 shadow-sm">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Date</th>
+                            <th>Shift Type</th>
+                            <th>Rig</th>
+                            <th>Location</th>
+                            <th>Supervisor</th>
+                            <th>Distance Drilled</th>
+                            <th>Internal Status</th>
+                            <th>Your Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for shift in shifts %}
+                        <tr>
+                            <td>{{ shift.date }}</td>
+                            <td>
+                                <span class="badge {% if shift.shift_type == 'day' %}bg-warning text-dark{% else %}bg-dark{% endif %}">
+                                    <i class="bi {% if shift.shift_type == 'day' %}bi-sun{% else %}bi-moon{% endif %}"></i>
+                                    {{ shift.get_shift_type_display }}
+                                </span>
+                            </td>
+                            <td>{{ shift.rig }}</td>
+                            <td>{{ shift.location }}</td>
+                            <td>{{ shift.supervisor_name|default:"--" }}</td>
+                            <td><strong>{{ shift.get_total_meters_drilled|floatformat:2 }} m</strong></td>
+                            <td>
+                                <span class="badge {% if shift.status == 'approved' %}bg-success{% else %}bg-secondary{% endif %}">
+                                    {{ shift.get_status_display }}
+                                </span>
+                            </td>
+                            <td>
+                                {% if shift.client_status %}
+                                <span class="badge {% if shift.client_status == 'client_approved' %}bg-success
+                                                 {% elif shift.client_status == 'client_rejected' %}bg-danger
+                                                 {% else %}bg-warning text-dark{% endif %}">
+                                    {{ shift.get_client_status_display }}
+                                </span>
+                                {% else %}
+                                <span class="badge bg-warning text-dark">Pending (Not Submitted)</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="btn-group">
+                                    <a href="{% url 'core:shift_detail' shift.pk %}" 
+                                       class="btn btn-sm btn-outline-primary">
+                                        <i class="bi bi-eye"></i> View
+                                    </a>
+                                    
+                                    {% if shift.status == 'approved' and shift.client_status == 'pending_client' %}
+                                    <button type="button" class="btn btn-sm btn-success" 
+                                            data-bs-toggle="modal" data-bs-target="#approvalModal{{ shift.pk }}">
+                                        <i class="bi bi-check2-circle"></i> Approve/Reject
+                                    </button>
+                                    {% elif shift.status == 'approved' and not shift.client_status %}
+                                    <button type="button" class="btn btn-sm btn-success" 
+                                            data-bs-toggle="modal" data-bs-target="#approvalModal{{ shift.pk }}">
+                                        <i class="bi bi-check2-circle"></i> Approve/Reject
+                                    </button>
+                                    {% elif shift.client_status == 'client_approved' %}
+                                    <span class="badge bg-success">Approved</span>
+                                    {% elif shift.client_status == 'client_rejected' %}
+                                    <span class="badge bg-danger">Rejected</span>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        
+                        <!-- Approval Modal -->
+                        {% if shift.status == 'approved' and shift.client_status == 'pending_client' %}
+                        <div class="modal fade" id="approvalModal{{ shift.pk }}" tabindex="-1">
+                            <div class="modal-dialog">
+                                <div class="modal-content">
+                                    <div class="modal-header">
+                                        <h5 class="modal-title">Review Shift Report - {{ shift.date }}</h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                    </div>
+                                    <form method="post" action="{% url 'core:client_approve_shift' shift.pk %}">
+                                        {% csrf_token %}
+                                        <div class="modal-body">
+                                            <div class="mb-3">
+                                                <label class="form-label"><strong>Decision</strong></label>
+                                                <select name="decision" class="form-select" required>
+                                                    <option value="">Choose...</option>
+                                                    <option value="approved">✓ Approve</option>
+                                                    <option value="rejected">✗ Reject</option>
+                                                </select>
+                                            </div>
+                                            <div class="mb-3">
+                                                <label class="form-label"><strong>Comments/Remarks</strong></label>
+                                                <textarea name="comments" class="form-control" rows="4" 
+                                                          placeholder="Enter your feedback or reason for rejection (required if rejecting)"></textarea>
+                                            </div>
+                                            <div class="alert alert-info mb-0">
+                                                <i class="bi bi-info-circle"></i>
+                                                <strong>Note:</strong> If you reject this shift, the team will be able to re-edit and resubmit it for your review again.
+                                            </div>
+                                        </div>
+                                        <div class="modal-footer">
+                                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                                                <i class="bi bi-x"></i> Cancel
+                                            </button>
+                                            <button type="submit" class="btn btn-primary">
+                                                <i class="bi bi-send"></i> Submit Decision
+                                            </button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                        {% elif shift.status == 'approved' and not shift.client_status %}
+                        <div class="modal fade" id="approvalModal{{ shift.pk }}" tabindex="-1">
+                            <div class="modal-dialog">
+                                <div class="modal-content">
+                                    <div class="modal-header">
+                                        <h5 class="modal-title">Review Shift Report - {{ shift.date }}</h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                    </div>
+                                    <form method="post" action="{% url 'core:client_approve_shift' shift.pk %}">
+                                        {% csrf_token %}
+                                        <div class="modal-body">
+                                            {% if not shift.client_status %}
+                                            <div class="alert alert-warning">
+                                                <i class="bi bi-exclamation-triangle"></i>
+                                                This shift was approved internally but not formally submitted. You can still record your decision.
+                                            </div>
+                                            {% endif %}
+                                            <div class="mb-3">
+                                                <label class="form-label"><strong>Decision</strong></label>
+                                                <select name="decision" class="form-select" required>
+                                                    <option value="">Choose...</option>
+                                                    <option value="approved">✓ Approve</option>
+                                                    <option value="rejected">✗ Reject</option>
+                                                </select>
+                                            </div>
+                                            <div class="mb-3">
+                                                <label class="form-label"><strong>Comments/Remarks</strong></label>
+                                                <textarea name="comments" class="form-control" rows="4" 
+                                                          placeholder="Enter your feedback or reason for rejection (required if rejecting)"></textarea>
+                                            </div>
+                                            <div class="alert alert-info mb-0">
+                                                <i class="bi bi-info-circle"></i>
+                                                <strong>Note:</strong> If you reject this shift, the team will be able to re-edit and resubmit it for your review again.
+                                            </div>
+                                        </div>
+                                        <div class="modal-footer">
+                                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                                                <i class="bi bi-x"></i> Cancel
+                                            </button>
+                                            <button type="submit" class="btn btn-primary">
+                                                <i class="bi bi-send"></i> Submit Decision
+                                            </button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+                        {% empty %}
+                        <tr>
+                            <td colspan="9" class="text-center p-4">
+                                <i class="bi bi-inbox display-4 text-muted d-block mb-2"></i>
+                                <p class="text-muted mb-0">No shifts to review.</p>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Prevent double submission and show loading state
+document.addEventListener('DOMContentLoaded', function() {
+    const forms = document.querySelectorAll('form[action*="client_approve_shift"]');
+    
+    forms.forEach(form => {
+        form.addEventListener('submit', function(e) {
+            const submitBtn = this.querySelector('button[type="submit"]');
+            const decision = this.querySelector('select[name="decision"]').value;
+            
+            // Validate decision is selected
+            if (!decision) {
+                e.preventDefault();
+                alert('Please select Approve or Reject');
+                return false;
+            }
+            
+            // Show loading state
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Processing...';
+            
+            // Log for debugging
+            console.log('Submitting approval:', decision, 'for form:', this.action);
+        });
+    });
+});
+</script>
+{% endblock %}

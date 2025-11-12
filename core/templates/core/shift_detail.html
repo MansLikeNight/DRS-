@@ -1,0 +1,1004 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block title %}Shift {{ shift.id }} - Daily Shift Report{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <h4 class="mb-0">Daily Report Summary</h4>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb mb-0">
+                    <li class="breadcrumb-item"><a href="{% url 'core:shift_list' %}">Home</a></li>
+                    <li class="breadcrumb-item"><a href="{% url 'core:shift_list' %}">Daily Shift Report</a></li>
+                    <li class="breadcrumb-item active">{{ shift.location }} - {{ shift.rig }} - {{ shift.date }}</li>
+                </ol>
+            </nav>
+        </div>
+        <div>
+            {% if user.userprofile.email %}
+            <span class="text-muted">{{ user.userprofile.email }}</span>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Summary Cards Row - 24 Hour Totals -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body text-center">
+                    <h2 class="display-6 mb-0">{{ shift.date|date:"Y-m-d" }}</h2>
+                    <small class="text-muted">{{ shift.rig }}</small>
+                    <p class="mb-0 mt-2">
+                        <span class="badge bg-info">
+                            <i class="bi bi-clock-history"></i> 24-HOUR REPORT
+                        </span>
+                    </p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body text-center">
+                    <h6 class="text-muted mb-2">Total Man Hours (24h)</h6>
+                    <h2 class="display-6 mb-0">{{ total_24h_man_hours|floatformat:1 }}</h2>
+                    <small class="text-muted">
+                        {% if companion_shift %}Day: {{ total_man_hours|floatformat:1 }} | Night: {{ companion_man_hours|floatformat:1 }}{% endif %}
+                    </small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body text-center">
+                    <h6 class="text-muted mb-2">Total Activity Hours (24h)</h6>
+                    <h2 class="display-6 mb-0">{{ total_24h_activity_hours|floatformat:1 }}</h2>
+                    <small class="text-muted">
+                        {% if companion_shift %}Day: {{ total_activity_hours|floatformat:1 }} | Night: {{ companion_activity_hours|floatformat:1 }}{% endif %}
+                    </small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body text-center">
+                    <h6 class="text-muted mb-2">Meters Drilled (24h)</h6>
+                    <h2 class="display-6 mb-0">{{ total_24h_meters|floatformat:2 }} m</h2>
+                    <small class="text-muted">
+                        {% if companion_shift %}Day: {{ total_meters|floatformat:2 }} | Night: {{ companion_meters|floatformat:2 }}{% endif %}
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 24-Hour Shift Overview Cards -->
+    <div class="row g-3 mb-4">
+        <!-- DAY SHIFT Card -->
+        <div class="col-md-6">
+            <div class="card border-0 shadow-sm {% if shift.shift_type == 'day' %}border-primary{% endif %}" style="border-width: 3px !important;">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="mb-0">
+                        <i class="bi bi-sun"></i> DAY SHIFT
+                        {% if shift.shift_type == 'day' %}<span class="badge bg-success float-end">VIEWING</span>{% endif %}
+                    </h5>
+                    <small>07:00 - 19:00 (12 hours)</small>
+                </div>
+                <div class="card-body">
+                    {% if shift.shift_type == 'day' or companion_shift.shift_type == 'day' %}
+                        {% with day_shift=shift|default:companion_shift %}
+                        {% if shift.shift_type == 'day' %}
+                                <h2 class="display-6 mb-0">{{ total_24h_meters|floatformat:2 }}m drilled</h2>
+                            <div class="row text-center mb-3">
+                                <div class="col-4">
+                                    <h4 class="text-primary">{{ day_meters|floatformat:2 }}m</h4>
+                                    <small class="text-muted">Meters Drilled</small>
+                                </div>
+                                <div class="col-4">
+                                    <h4 class="text-primary">{{ total_man_hours|floatformat:1 }}</h4>
+                                    <small class="text-muted">Man Hours</small>
+                                </div>
+                                <div class="col-4">
+                                    <h4 class="text-primary">{{ total_activity_hours|floatformat:1 }}</h4>
+                                    <small class="text-muted">Activity Hours</small>
+                                </div>
+                            </div>
+                            <table class="table table-sm table-borderless">
+                                <tr>
+                                    <th width="40%">Supervisor:</th>
+                                    <td>{{ shift.supervisor_name|default:"--" }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Driller:</th>
+                                    <td>{{ shift.driller_name|default:"--" }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Status:</th>
+                                    <td>
+                                        <span class="badge {% if shift.status == 'approved' %}bg-success{% elif shift.status == 'rejected' %}bg-danger{% elif shift.status == 'submitted' %}bg-warning{% else %}bg-secondary{% endif %}">
+                                            {{ shift.get_status_display }}
+                                        </span>
+                                    </td>
+                                </tr>
+                            </table>
+                            <!-- Collapsible Details Button -->
+                            <button class="btn btn-outline-primary btn-sm w-100" type="button" data-bs-toggle="collapse" data-bs-target="#dayShiftDetails">
+                                <i class="bi bi-chevron-down"></i> View Full Details
+                            </button>
+                            {% endwith %}
+                        {% elif companion_shift and companion_shift.shift_type == 'day' %}
+                            {% with day_meters=companion_meters %}
+                            <div class="row text-center mb-3">
+                                <div class="col-4">
+                                    <h4 class="text-primary">{{ day_meters|floatformat:2 }}m</h4>
+                                    <small class="text-muted">Meters Drilled</small>
+                                </div>
+                                <div class="col-4">
+                                    <h4 class="text-primary">{{ companion_man_hours|floatformat:1 }}</h4>
+                                    <small class="text-muted">Man Hours</small>
+                                </div>
+                                <div class="col-4">
+                                    <h4 class="text-primary">{{ companion_activity_hours|floatformat:1 }}</h4>
+                                    <small class="text-muted">Activity Hours</small>
+                                </div>
+                            </div>
+                            <table class="table table-sm table-borderless">
+                                <tr>
+                                    <th width="40%">Supervisor:</th>
+                                    <td>{{ companion_shift.supervisor_name|default:"--" }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Driller:</th>
+                                    <td>{{ companion_shift.driller_name|default:"--" }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Status:</th>
+                                    <td>
+                                        <span class="badge {% if companion_shift.status == 'approved' %}bg-success{% elif companion_shift.status == 'rejected' %}bg-danger{% elif companion_shift.status == 'submitted' %}bg-warning{% else %}bg-secondary{% endif %}">
+                                            {{ companion_shift.get_status_display }}
+                                        </span>
+                                    </td>
+                                </tr>
+                            </table>
+                            <a href="{% url 'core:shift_detail' companion_shift.pk %}" class="btn btn-primary btn-sm w-100">
+                                <i class="bi bi-eye"></i> View This Shift
+                            </a>
+                            {% endwith %}
+                        {% endif %}
+                        {% endwith %}
+                    {% else %}
+                    <div class="text-center text-muted py-4">
+                        <i class="bi bi-sun" style="font-size: 3rem;"></i>
+                        <p>No day shift recorded for {{ shift.date|date:"Y-m-d" }}</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- NIGHT SHIFT Card -->
+        <div class="col-md-6">
+            <div class="card border-0 shadow-sm {% if shift.shift_type == 'night' %}border-primary{% endif %}" style="border-width: 3px !important;">
+                <div class="card-header bg-dark text-white">
+                    <h5 class="mb-0">
+                        <i class="bi bi-moon-stars"></i> NIGHT SHIFT
+                        {% if shift.shift_type == 'night' %}<span class="badge bg-success float-end">VIEWING</span>{% endif %}
+                    </h5>
+                    <small>19:00 - 07:00 (12 hours)</small>
+                </div>
+                <div class="card-body">
+                    {% if shift.shift_type == 'night' or companion_shift.shift_type == 'night' %}
+                        {% if shift.shift_type == 'night' %}
+                            <div class="row text-center mb-3">
+                                <div class="col-4">
+                                    <h4 class="text-primary">{{ total_meters|floatformat:2 }}m</h4>
+                                    <small class="text-muted">Meters Drilled</small>
+                                </div>
+                                <div class="col-4">
+                                    <h4 class="text-primary">{{ total_man_hours|floatformat:1 }}</h4>
+                                    <small class="text-muted">Man Hours</small>
+                                </div>
+                                <div class="col-4">
+                                    <h4 class="text-primary">{{ total_activity_hours|floatformat:1 }}</h4>
+                                    <small class="text-muted">Activity Hours</small>
+                                </div>
+                            </div>
+                            <table class="table table-sm table-borderless">
+                                <tr>
+                                    <th width="40%">Supervisor:</th>
+                                    <td>{{ shift.supervisor_name|default:"--" }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Driller:</th>
+                                    <td>{{ shift.driller_name|default:"--" }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Status:</th>
+                                    <td>
+                                        <span class="badge {% if shift.status == 'approved' %}bg-success{% elif shift.status == 'rejected' %}bg-danger{% elif shift.status == 'submitted' %}bg-warning{% else %}bg-secondary{% endif %}">
+                                            {{ shift.get_status_display }}
+                                        </span>
+                                    </td>
+                                </tr>
+                            </table>
+                            <!-- Collapsible Details Button -->
+                            <button class="btn btn-outline-dark btn-sm w-100" type="button" data-bs-toggle="collapse" data-bs-target="#nightShiftDetails">
+                                <i class="bi bi-chevron-down"></i> View Full Details
+                            </button>
+                        {% elif companion_shift and companion_shift.shift_type == 'night' %}
+                            <div class="row text-center mb-3">
+                                <div class="col-4">
+                                    <h4 class="text-primary">{{ companion_meters|floatformat:2 }}m</h4>
+                                    <small class="text-muted">Meters Drilled</small>
+                                </div>
+                                <div class="col-4">
+                                    <h4 class="text-primary">{{ companion_man_hours|floatformat:1 }}</h4>
+                                    <small class="text-muted">Man Hours</small>
+                                </div>
+                                <div class="col-4">
+                                    <h4 class="text-primary">{{ companion_activity_hours|floatformat:1 }}</h4>
+                                    <small class="text-muted">Activity Hours</small>
+                                </div>
+                            </div>
+                            <table class="table table-sm table-borderless">
+                                <tr>
+                                    <th width="40%">Supervisor:</th>
+                                    <td>{{ companion_shift.supervisor_name|default:"--" }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Driller:</th>
+                                    <td>{{ companion_shift.driller_name|default:"--" }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Status:</th>
+                                    <td>
+                                        <span class="badge {% if companion_shift.status == 'approved' %}bg-success{% elif companion_shift.status == 'rejected' %}bg-danger{% elif companion_shift.status == 'submitted' %}bg-warning{% else %}bg-secondary{% endif %}">
+                                            {{ companion_shift.get_status_display }}
+                                        </span>
+                                    </td>
+                                </tr>
+                            </table>
+                            <a href="{% url 'core:shift_detail' companion_shift.pk %}" class="btn btn-dark btn-sm w-100">
+                                <i class="bi bi-eye"></i> View This Shift
+                            </a>
+                        {% endif %}
+                    {% else %}
+                    <div class="text-center text-muted py-4">
+                        <i class="bi bi-moon-stars" style="font-size: 3rem;"></i>
+                        <p>No night shift recorded for {{ shift.date|date:"Y-m-d" }}</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+        <!-- PDF Download and Actions -->
+    <div class="row g-3 mb-4">
+        <div class="col-12">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body text-center">
+                    <a href="{% url 'core:shift_pdf_export' shift.pk %}" class="btn btn-danger btn-lg" target="_blank">
+                        <i class="bi bi-file-pdf"></i> Download 24-Hour PDF Report
+                    </a>
+                    {% if shift.shift_type == 'day' and not shift.is_locked and shift.created_by == user %}
+                    <a href="{% url 'core:shift_update' shift.pk %}" class="btn btn-outline-primary btn-lg">
+                        <i class="bi bi-pencil"></i> Edit Day Shift
+                    </a>
+                    {% elif shift.shift_type == 'night' and not shift.is_locked and shift.created_by == user %}
+                    <a href="{% url 'core:shift_update' shift.pk %}" class="btn btn-outline-dark btn-lg">
+                        <i class="bi bi-pencil"></i> Edit Night Shift
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+        <!-- 24-Hour Total Summary (if companion shift exists) -->
+        {% if companion_shift %}
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="alert alert-success shadow-sm">
+                    <strong><i class="bi bi-check-circle"></i> 24-HOUR TOTAL:</strong>
+                    {{ total_24h_meters|floatformat:2 }} m drilled | Man Hours: {{ total_24h_man_hours|floatformat:1 }} | Activity Hours: {{ total_24h_activity_hours|floatformat:1 }}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+    <!-- Collapsible Detailed Information - Only for Current Viewing Shift -->
+    {% if shift.shift_type == 'day' %}
+    <div class="collapse" id="dayShiftDetails">
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header bg-warning text-dark">
+                <h5 class="mb-0"><i class="bi bi-sun"></i> DAY SHIFT - DETAILED INFORMATION</h5>
+            </div>
+            <div class="card-body">
+    {% elif shift.shift_type == 'night' %}
+    <div class="collapse" id="nightShiftDetails">
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header bg-dark text-white">
+                <h5 class="mb-0"><i class="bi bi-moon-stars"></i> NIGHT SHIFT - DETAILED INFORMATION</h5>
+            </div>
+            <div class="card-body">
+    {% endif %}
+
+    <!-- Main Content Area (Old sidebar content goes inside collapsible) -->
+    <div class="row g-3">
+        <!-- Left column: Basic info, crew, standby -->
+        <div class="col-md-6">
+            <!-- Shift Info Card -->
+            <div class="card border-0 shadow-sm mb-3">
+                <div class="card-body">
+                    <h6 class="card-title border-bottom pb-2 mb-3">SHIFT INFORMATION</h6>
+                    <dl class="row mb-2">
+                        <dt class="col-5 text-muted small">Drill</dt>
+                        <dd class="col-7 small mb-2">{{ shift.rig }}</dd>
+                        
+                        <dt class="col-5 text-muted small">Location</dt>
+                        <dd class="col-7 small mb-2">{{ shift.location|default:"--" }}</dd>
+                        
+                        <dt class="col-5 text-muted small">Client</dt>
+                        <dd class="col-7 small mb-2">{{ shift.client.name|default:"--" }}</dd>
+                        
+                        <dt class="col-5 text-muted small">Supervisor</dt>
+                        <dd class="col-7 small mb-2">{{ shift.supervisor_name|default:"--" }}</dd>
+                        
+                        <dt class="col-5 text-muted small">Driller</dt>
+                        <dd class="col-7 small mb-2">{{ shift.driller_name|default:"--" }}</dd>
+                        
+                        {% if shift.helper1_name or shift.helper2_name or shift.helper3_name or shift.helper4_name %}
+                        <dt class="col-5 text-muted small">Helpers</dt>
+                        <dd class="col-7 small mb-2">
+                            {% if shift.helper1_name %}{{ shift.helper1_name }}{% endif %}
+                            {% if shift.helper2_name %}{% if shift.helper1_name %}, {% endif %}{{ shift.helper2_name }}{% endif %}
+                            {% if shift.helper3_name %}{% if shift.helper1_name or shift.helper2_name %}, {% endif %}{{ shift.helper3_name }}{% endif %}
+                            {% if shift.helper4_name %}{% if shift.helper1_name or shift.helper2_name or shift.helper3_name %}, {% endif %}{{ shift.helper4_name }}{% endif %}
+                        </dd>
+                        {% endif %}
+                    </dl>
+                </div>
+            </div>
+
+            <!-- Standby Information -->
+            {% if shift.standby_client or shift.standby_constructor %}
+            <div class="card border-0 shadow-sm mb-3">
+                <div class="card-body">
+                    <h6 class="card-title border-bottom pb-2 mb-3">
+                        <i class="bi bi-exclamation-triangle text-warning"></i> STANDBY INFORMATION
+                    </h6>
+                    
+                    {% if shift.standby_client %}
+                    <div class="alert alert-warning mb-3">
+                        <h6 class="alert-heading">
+                            <i class="bi bi-person-badge"></i> Client Standby
+                        </h6>
+                        <p class="mb-1"><strong>Reason:</strong> {{ shift.get_standby_client_reason_display }}</p>
+                        {% if shift.standby_client_remarks %}
+                        <p class="mb-0"><strong>Remarks:</strong> {{ shift.standby_client_remarks }}</p>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                    
+                    {% if shift.standby_constructor %}
+                    <div class="alert alert-info mb-0">
+                        <h6 class="alert-heading">
+                            <i class="bi bi-tools"></i> Constructor Standby
+                        </h6>
+                        <p class="mb-1"><strong>Reason:</strong> {{ shift.get_standby_constructor_reason_display }}</p>
+                        {% if shift.standby_constructor_remarks %}
+                        <p class="mb-0"><strong>Remarks:</strong> {{ shift.standby_constructor_remarks }}</p>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Right column: Comments -->
+        <div class="col-md-6">
+            <div class="card border-0 shadow-sm mb-3">
+                <div class="card-body">
+                    <h6 class="card-title mb-3"><i class="bi bi-chat-left-text"></i> COMMENTS & NOTES</h6>
+                    {% if shift.notes %}
+                    <p class="text-muted">{{ shift.notes }}</p>
+                    {% else %}
+                    <p class="text-muted">No comments entered for this shift</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- End of basic details; detailed tables follow inside the collapsible -->
+            <!-- Comments & Attachments -->
+            <div class="card border-0 shadow-sm mb-3">
+                <div class="card-body">
+                    <h6 class="card-title mb-3"><i class="bi bi-chat-left-text"></i> Comments & Attachments</h6>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <div class="d-flex">
+                                <i class="bi bi-pencil me-2"></i>
+                                <div>
+                                    <strong class="d-block">DAY</strong>
+                                    <small class="text-muted">
+                                        {% if shift.notes and shift.shift_type == 'day' %}
+                                            {{ shift.notes }}
+                                        {% else %}
+                                            no comments or attachments entered for this shift
+                                        {% endif %}
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <div class="d-flex">
+                                <i class="bi bi-pencil me-2"></i>
+                                <div>
+                                    <strong class="d-block">NIGHT</strong>
+                                    <small class="text-muted">
+                                        {% if shift.notes and shift.shift_type == 'night' %}
+                                            {{ shift.notes }}
+                                        {% else %}
+                                            no comments or attachments entered for this shift
+                                        {% endif %}
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Survey Data -->
+            {% if shift.surveys.all %}
+            <div class="card border-0 shadow-sm mb-3">
+                <div class="card-body">
+                    <h6 class="card-title mb-3">SURVEYS</h6>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Survey Type</th>
+                                    <th>Depth</th>
+                                    <th>Dip Angle</th>
+                                    <th>Azimuth</th>
+                                    <th>Surveyor</th>
+                                    <th>Findings</th>
+                                    <th>Time</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for survey in shift.surveys.all %}
+                                <tr>
+                                    <td><span class="badge bg-info">{{ survey.get_survey_type_display }}</span></td>
+                                    <td>{{ survey.depth }}m</td>
+                                    <td>{{ survey.dip_angle }}°</td>
+                                    <td>{{ survey.azimuth }}°</td>
+                                    <td>{{ survey.surveyor_name|default:"--" }}</td>
+                                    <td>{{ survey.findings|truncatewords:10 }}</td>
+                                    <td>{{ survey.survey_time|date:"H:i" }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Casing Data -->
+            {% if shift.casings.all %}
+            <div class="card border-0 shadow-sm mb-3">
+                <div class="card-body">
+                    <h6 class="card-title mb-3">CASING</h6>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Size</th>
+                                    <th>Type</th>
+                                    <th>Start Depth</th>
+                                    <th>End Depth</th>
+                                    <th>Length</th>
+                                    <th>Remarks</th>
+                                    <th>Installed</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for casing in shift.casings.all %}
+                                <tr>
+                                    <td><span class="badge bg-secondary">{{ casing.casing_size }}</span></td>
+                                    <td>{{ casing.get_casing_type_display }}</td>
+                                    <td>{{ casing.start_depth }}m</td>
+                                    <td>{{ casing.end_depth }}m</td>
+                                    <td><strong>{{ casing.length }}m</strong></td>
+                                    <td>{{ casing.remarks|truncatewords:10|default:"--" }}</td>
+                                    <td>{{ casing.installed_at|date:"H:i" }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Activities Breakdown with Chart -->
+            <div class="card border-0 shadow-sm mb-3">
+                <div class="card-body">
+                    <h6 class="card-title mb-3">ACTIVITIES BREAKDOWN</h6>
+                    
+                    <!-- Summary Stats -->
+                    <div class="row text-center mb-3">
+                        <div class="col">
+                            <small class="text-muted d-block">Drilling</small>
+                            <strong id="drillingHours">--</strong>
+                        </div>
+                        <div class="col">
+                            <small class="text-muted d-block">Maintenance</small>
+                            <strong id="maintenanceHours">--</strong>
+                        </div>
+                        <div class="col">
+                            <small class="text-muted d-block">Safety</small>
+                            <strong id="safetyHours">--</strong>
+                        </div>
+                        <div class="col">
+                            <small class="text-muted d-block">Standby</small>
+                            <strong id="standbyHours">--</strong>
+                        </div>
+                        <div class="col">
+                            <small class="text-muted d-block">Other</small>
+                            <strong id="otherHours">--</strong>
+                        </div>
+                    </div>
+                    
+                    <!-- Compact Activity Chart -->
+                    <div class="activity-chart mb-3" style="height: 60px; min-width: 280px; background: #fafafa; border-radius: 6px;">
+                        <canvas id="activityChart"></canvas>
+                    </div>
+
+                    <!-- Activities Detail Table -->
+                    {% if shift.activities.all %}
+                    <h6 class="text-muted small mt-4 mb-2">ACTIVITY DETAILS</h6>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Time</th>
+                                    <th>Type</th>
+                                    <th>Duration</th>
+                                    <th>Description</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for activity in shift.activities.all %}
+                                <tr>
+                                    <td>{{ activity.start_time|date:"H:i" }}</td>
+                                    <td>
+                                        <span class="badge 
+                                            {% if activity.activity_type == 'drilling' %}bg-success
+                                            {% elif activity.activity_type == 'maintenance' %}bg-warning
+                                            {% elif activity.activity_type == 'safety' %}bg-info
+                                            {% elif activity.activity_type == 'meeting' %}bg-primary
+                                            {% else %}bg-secondary{% endif %}">
+                                            {{ activity.get_activity_type_display }}
+                                        </span>
+                                    </td>
+                                    <td><strong>{{ activity.duration_minutes|default:"--" }} min</strong></td>
+                                    <td>{{ activity.description|truncatewords:15|default:"--" }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="alert alert-light mt-3 mb-0">
+                        <small class="text-muted"><i class="bi bi-info-circle"></i> No detailed activities logged for this shift.</small>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Drilling Progress Table -->
+            <div class="card border-0 shadow-sm mb-3">
+                <div class="card-body">
+                    <h6 class="card-title mb-3">DRILLING PROGRESS</h6>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Shift</th>
+                                    <th>Hole</th>
+                                    <th>Size</th>
+                                    <th>Depth (From)</th>
+                                    <th>Depth (To)</th>
+                                    <th>Meters Drilled</th>
+                                    <th>Rate of Penetration</th>
+                                    <th>Core Recovery %</th>
+                                    <th>Core Tray Image</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for progress in shift.progress.all %}
+                                <tr>
+                                    <td>{{ shift.get_shift_type_display|title }}</td>
+                                    <td>{{ progress.hole_number|default:"--" }}</td>
+                                    <td>{{ progress.get_size_display|default:"HQ" }}</td>
+                                    <td>{{ progress.start_depth }}m</td>
+                                    <td>{{ progress.end_depth }}m</td>
+                                    <td><strong>{{ progress.meters_drilled|floatformat:2 }}m</strong></td>
+                                    <td>{{ progress.penetration_rate|floatformat:2|default:"--" }} m/hr</td>
+                                    <td>{{ progress.recovery_percentage|floatformat:1|default:"--" }}%</td>
+                                    <td>
+                                        {% if progress.core_tray_image %}
+                                        <a href="{{ progress.core_tray_image.url }}" class="core-image-link" data-lightbox="core-trays" data-title="Hole {{ progress.hole_number|default:'--' }} - {{ progress.start_depth }}m to {{ progress.end_depth }}m">
+                                            <img src="{{ progress.core_tray_image.url }}" alt="Core Tray" style="width: 60px; height: 60px; object-fit: cover; border-radius: 4px; cursor: pointer; border: 2px solid #ddd;">
+                                        </a>
+                                        {% else %}
+                                        <span class="text-muted small">No image</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="9" class="text-center text-muted">No drilling progress recorded</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                            <tfoot class="table-light">
+                                <tr>
+                                    <td colspan="5" class="text-end"><strong>Total:</strong></td>
+                                    <td><strong>{{ total_meters }}m</strong></td>
+                                    <td colspan="3"></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Materials Used -->
+            {% if shift.materials.all %}
+            <div class="card border-0 shadow-sm mb-3">
+                <div class="card-body">
+                    <h6 class="card-title mb-3">MATERIALS USED</h6>
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Material</th>
+                                    <th>Quantity</th>
+                                    <th>Unit</th>
+                                    <th>Remarks</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for material in shift.materials.all %}
+                                <tr>
+                                    <td>{{ material.material_name }}</td>
+                                    <td>{{ material.quantity }}</td>
+                                    <td>{{ material.unit }}</td>
+                                    <td>{{ material.remarks }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+            
+            </div><!-- End card-body for collapsible -->
+        </div><!-- End collapsible card -->
+    </div><!-- End collapse div -->
+
+            <!-- Approval Section -->
+            {% if shift.status == 'submitted' and user.is_staff %}
+            <div class="card border-0 shadow-sm mb-3">
+                <div class="card-body">
+                    <h6 class="card-title mb-3">Approval Decision</h6>
+                    <form method="post" action="{% url 'core:shift_approve' shift.pk %}">
+                        {% csrf_token %}
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <select name="decision" class="form-select" required>
+                                    <option value="">Choose Decision...</option>
+                                    <option value="approved">Approve</option>
+                                    <option value="rejected">Reject</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <input type="text" name="comments" class="form-control" placeholder="Comments (optional)">
+                            </div>
+                            <div class="col-md-2">
+                                <button type="submit" class="btn btn-primary w-100">Submit</button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            {% endif %}
+            
+            <!-- Client Approval Section -->
+            {% if shift.client_status == 'pending_client' and user.client_profile %}
+            <div class="card border-0 shadow-sm mb-3 border-warning">
+                <div class="card-body">
+                    <h6 class="card-title mb-3">
+                        <i class="bi bi-building"></i> Client Approval Required
+                    </h6>
+                    <form method="post" action="{% url 'core:client_approve_shift' shift.pk %}">
+                        {% csrf_token %}
+                        <div class="row g-3">
+                            <div class="col-12">
+                                <label class="form-label">Your Decision</label>
+                                <select name="decision" class="form-select" required>
+                                    <option value="">Choose Decision...</option>
+                                    <option value="approved">Approve</option>
+                                    <option value="rejected">Reject</option>
+                                </select>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label">Comments/Remarks</label>
+                                <textarea name="comments" class="form-control" rows="3" 
+                                          placeholder="Enter your feedback or reason for rejection"></textarea>
+                            </div>
+                            <div class="col-12">
+                                <div class="alert alert-info">
+                                    <i class="bi bi-info-circle"></i> If you reject this shift, the team will be able to re-edit and resubmit it.
+                                </div>
+                            </div>
+                            <div class="col-12">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="bi bi-check2-square"></i> Submit Decision
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            {% endif %}
+            
+            <!-- Client Rejection Feedback -->
+            {% if shift.client_status == 'client_rejected' %}
+            <div class="card border-0 shadow-sm mb-3 border-danger">
+                <div class="card-body">
+                    <h6 class="card-title text-danger mb-3">
+                        <i class="bi bi-x-circle"></i> Client Rejected
+                    </h6>
+                    <div class="alert alert-danger">
+                        <strong>Rejected on:</strong> {{ shift.client_approved_at|date:"Y-m-d H:i" }}<br>
+                        {% if shift.client_approved_by %}
+                        <strong>By:</strong> {{ shift.client_approved_by.get_full_name|default:shift.client_approved_by.username }}<br>
+                        {% endif %}
+                        {% if shift.client_comments %}
+                        <hr>
+                        <strong>Reason:</strong> {{ shift.client_comments }}
+                        {% endif %}
+                    </div>
+                    <p class="text-muted mb-0">
+                        <i class="bi bi-info-circle"></i> This shift can now be re-edited and resubmitted for approval.
+                    </p>
+                </div>
+            </div>
+            {% endif %}
+            
+            <!-- Client Approval Success -->
+            {% if shift.client_status == 'client_approved' %}
+            <div class="card border-0 shadow-sm mb-3 border-success">
+                <div class="card-body">
+                    <h6 class="card-title text-success mb-3">
+                        <i class="bi bi-check-circle"></i> Client Approved
+                    </h6>
+                    <div class="alert alert-success">
+                        <strong>Approved on:</strong> {{ shift.client_approved_at|date:"Y-m-d H:i" }}<br>
+                        {% if shift.client_approved_by %}
+                        <strong>By:</strong> {{ shift.client_approved_by.get_full_name|default:shift.client_approved_by.username }}<br>
+                        {% endif %}
+                        {% if shift.client_comments %}
+                        <hr>
+                        <strong>Comments:</strong> {{ shift.client_comments }}
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Approval History -->
+            {% if shift.approvals.all %}
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <h6 class="card-title mb-3">Approval History</h6>
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Date/Time</th>
+                                    <th>Decision</th>
+                                    <th>By</th>
+                                    <th>Comments</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for approval in shift.approvals.all %}
+                                <tr>
+                                    <td>{{ approval.timestamp|date:"Y-m-d H:i" }}</td>
+                                    <td>
+                                        <span class="badge {% if approval.decision == 'approved' %}bg-success{% elif approval.decision == 'rejected' %}bg-danger{% else %}bg-warning{% endif %}">
+                                            {{ approval.get_decision_display|upper }}
+                                        </span>
+                                    </td>
+                                    <td>{% if approval.approver %}{{ approval.approver.get_full_name|default:approval.approver.username }}{% else %}--{% endif %}</td>
+                                    <td>{{ approval.comments|default:"--" }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Chart.js for Activity Timeline -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+<!-- Django-rendered data (JSON, ignored by JS linter) -->
+<script id="shift-data" type="application/json">
+{
+  "progressData": [
+    {% for progress in shift.progress.all %}
+    {
+      "hole": "{{ progress.hole_number|default:'--' }}",
+      "start": "{{ progress.start_time|time:'H:i' }}",
+      "end": "{{ progress.end_time|time:'H:i' }}"
+    }{% if not forloop.last %},{% endif %}
+    {% endfor %}
+  ],
+  "activitiesData": [
+    {% for activity in shift.activities.all %}
+    {
+      "type": "{{ activity.activity_type }}",
+      "minutes": {{ activity.duration_minutes|default:0 }}
+    }{% if not forloop.last %},{% endif %}
+    {% endfor %}
+  ],
+  "standbyEnabled": {% if shift.standby_client or shift.standby_constructor %}true{% else %}false{% endif %},
+  "shiftHours": {{ shift.get_shift_hours|default:12 }}
+}
+</script>
+
+<script>
+// Pure JS: parse data and render chart
+window.addEventListener('load', function() {
+    const shiftDataEl = document.getElementById('shift-data');
+    if (!shiftDataEl) return;
+    const data = JSON.parse(shiftDataEl.textContent);
+
+    const progressData = data.progressData || [];
+    const activitiesData = data.activitiesData || [];
+
+    // Calculate drilling hours
+    let totalDrillingHours = 0;
+    progressData.forEach(p => {
+        if (!p.start || !p.end) return;
+        const start = new Date(`2000-01-01T${p.start}:00`);
+        const end = new Date(`2000-01-01T${p.end}:00`);
+        let diff = (end - start) / (1000 * 60 * 60);
+        if (diff < 0) diff += 24;
+        totalDrillingHours += diff;
+    });
+
+    // Aggregate activity hours
+    const activityHours = { drilling: totalDrillingHours, maintenance: 0, safety: 0, meeting: 0, other: 0 };
+    activitiesData.forEach(a => {
+        if (activityHours[a.type] === undefined) activityHours[a.type] = 0;
+        activityHours[a.type] += a.minutes / 60;
+    });
+
+    // Standby hours
+    let standbyHours = 0;
+    if (data.standbyEnabled) {
+        const shiftHours = data.shiftHours;
+        standbyHours = shiftHours - totalDrillingHours - (activityHours.maintenance + activityHours.safety + activityHours.meeting + activityHours.other);
+        if (standbyHours < 0) standbyHours = 0;
+    }
+
+    // Inject summary figures
+    const drillingEl = document.getElementById('drillingHours');
+    const maintenanceEl = document.getElementById('maintenanceHours');
+    const safetyEl = document.getElementById('safetyHours');
+    const standbyEl = document.getElementById('standbyHours');
+    const otherEl = document.getElementById('otherHours');
+    if (drillingEl) drillingEl.textContent = totalDrillingHours.toFixed(1) + 'h';
+    if (maintenanceEl) maintenanceEl.textContent = activityHours.maintenance.toFixed(1) + 'h';
+    if (safetyEl) safetyEl.textContent = activityHours.safety.toFixed(1) + 'h';
+    if (standbyEl) standbyEl.textContent = standbyHours.toFixed(1) + 'h';
+    if (otherEl) otherEl.textContent = (activityHours.meeting + activityHours.other).toFixed(1) + 'h';
+
+    // Chart rendering
+    const activityCtx = document.getElementById('activityChart');
+    const allHoursTotal = totalDrillingHours + activityHours.maintenance + activityHours.safety + activityHours.meeting + activityHours.other + standbyHours;
+    if (allHoursTotal === 0 && activityCtx) {
+        const container = activityCtx.parentElement;
+        container.style.height = 'auto';
+        container.innerHTML = '<div class="text-center text-muted py-2">No activity or drilling time recorded yet. Add progress & activities to see the chart.</div>';
+        return;
+    }
+    if (!activityCtx || typeof Chart === 'undefined') return;
+
+    new Chart(activityCtx.getContext('2d'), {
+        type: 'bar',
+        data: {
+            labels: [''],
+            datasets: [
+                { label: 'Drilling', data: [activityHours.drilling], backgroundColor: '#4CAF50' },
+                { label: 'Maintenance', data: [activityHours.maintenance], backgroundColor: '#FF9800' },
+                { label: 'Safety', data: [activityHours.safety], backgroundColor: '#2196F3' },
+                { label: 'Meetings', data: [activityHours.meeting], backgroundColor: '#9C27B0' },
+                { label: 'Standby', data: [standbyHours], backgroundColor: '#F44336' },
+                { label: 'Other', data: [activityHours.other], backgroundColor: '#607D8B' }
+            ]
+        },
+        options: {
+            indexAxis: 'y',
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                x: { stacked: true, beginAtZero: true, max: data.shiftHours, ticks: { display: false }, grid: { display: false } },
+                y: { stacked: true, display: false }
+            },
+            plugins: {
+                legend: { display: true, position: 'bottom', labels: { boxWidth: 12, padding: 8, font: { size: 11 } } },
+                tooltip: { callbacks: { label: (ctx) => `${ctx.dataset.label}: ${ctx.parsed.x.toFixed(2)}h` } }
+            }
+        }
+    });
+});
+
+// Simple lightbox for core tray images
+document.addEventListener('DOMContentLoaded', function() {
+    const imageLinks = document.querySelectorAll('.core-image-link');
+    if (imageLinks.length === 0) return;
+    
+    // Create lightbox modal
+    const lightbox = document.createElement('div');
+    lightbox.id = 'image-lightbox';
+    lightbox.style.cssText = 'display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:9999; align-items:center; justify-content:center;';
+    lightbox.innerHTML = `
+        <div style="position:relative; max-width:90%; max-height:90%; text-align:center;">
+            <span style="position:absolute; top:-40px; right:0; color:white; font-size:40px; cursor:pointer;">&times;</span>
+            <img id="lightbox-img" src="" style="max-width:100%; max-height:90vh; border-radius:8px;">
+            <p id="lightbox-caption" style="color:white; margin-top:10px; font-size:16px;"></p>
+        </div>
+    `;
+    document.body.appendChild(lightbox);
+    
+    const lightboxImg = document.getElementById('lightbox-img');
+    const lightboxCaption = document.getElementById('lightbox-caption');
+    const closeBtn = lightbox.querySelector('span');
+    
+    // Add click handlers to image links
+    imageLinks.forEach(link => {
+        link.addEventListener('click', function(e) {
+            e.preventDefault();
+            lightboxImg.src = this.href;
+            lightboxCaption.textContent = this.getAttribute('data-title') || '';
+            lightbox.style.display = 'flex';
+        });
+    });
+    
+    // Close lightbox
+    closeBtn.addEventListener('click', () => lightbox.style.display = 'none');
+    lightbox.addEventListener('click', (e) => {
+        if (e.target === lightbox) lightbox.style.display = 'none';
+    });
+});
+</script>
+{% endblock %}

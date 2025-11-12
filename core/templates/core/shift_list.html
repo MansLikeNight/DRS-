@@ -1,0 +1,219 @@
+{% extends 'core/base.html' %}
+
+{% block title %}Shifts - Daily Shift Report{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>Daily Shift Reports</h2>
+    {% if user.is_authenticated %}
+    <a href="{% url 'core:shift_create' %}" class="btn btn-primary">
+        <i class="bi bi-plus-lg"></i> New Shift
+    </a>
+    {% endif %}
+</div>
+
+<!-- Filters and Export -->
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="get" class="row g-3">
+            <div class="col-md-3">
+                <label class="form-label">Status</label>
+                <select name="status" class="form-select">
+                    <option value="">All</option>
+                    {% for value, label in status_choices %}
+                    <option value="{{ value }}" {% if request.GET.status == value %}selected{% endif %}>
+                        {{ label }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Hole Number</label>
+                <select name="hole_number" class="form-select">
+                    <option value="">All Holes</option>
+                    {% for hole in hole_numbers %}
+                    <option value="{{ hole }}" {% if selected_hole == hole %}selected{% endif %}>
+                        {{ hole }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Start Date</label>
+                <input type="date" name="start_date" class="form-control" value="{{ request.GET.start_date }}">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">End Date</label>
+                <input type="date" name="end_date" class="form-control" value="{{ request.GET.end_date }}">
+            </div>
+            <div class="col-12 d-flex justify-content-between align-items-end">
+                <div>
+                    <button type="submit" class="btn btn-secondary">
+                        <i class="bi bi-funnel"></i> Filter
+                    </button>
+                    <a href="{% url 'core:shift_list' %}" class="btn btn-outline-secondary">
+                        <i class="bi bi-x-circle"></i> Clear
+                    </a>
+                </div>
+                <div class="btn-group">
+                    <a href="{% url 'core:export_shifts' %}{% if request.GET %}?{{ request.GET.urlencode }}{% endif %}" 
+                       class="btn btn-outline-primary">
+                        <i class="bi bi-file-earmark-spreadsheet"></i> Export to CSV
+                    </a>
+                    <a href="{% url 'core:export_boq' %}{% if request.GET %}?{{ request.GET.urlencode }}{% endif %}" 
+                       class="btn btn-outline-success">
+                        <i class="bi bi-file-earmark-excel"></i> Export BOQ
+                    </a>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Shifts Table (Grouped by Machine per 24 hours) -->
+<div class="table-responsive">
+    <table class="table table-striped table-hover">
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Rig</th>
+                <th>Location</th>
+                <th>Shift Type</th>
+                <th>Internal Status</th>
+                <th>Client Status</th>
+                <th>Created By</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for group in shift_groups %}
+            <tr>
+                <td><strong>{{ group.date }}</strong></td>
+                <td><strong>{{ group.rig }}</strong></td>
+                <td>
+                    {{ group.location }}
+                    {% if group.day.standby_client or group.night.standby_client %}
+                    <br><span class="badge bg-warning text-dark">
+                        <i class="bi bi-person-badge"></i> Client Standby
+                    </span>
+                    {% endif %}
+                    {% if group.day.standby_constructor or group.night.standby_constructor %}
+                    <br><span class="badge bg-info">
+                        <i class="bi bi-tools"></i> Constructor Standby
+                    </span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if group.day %}
+                    <span class="badge bg-warning text-dark">
+                        <i class="bi bi-sun"></i> Day Shift
+                    </span>
+                    {% endif %}
+                    {% if group.night %}
+                    <span class="badge bg-dark">
+                        <i class="bi bi-moon"></i> Night Shift
+                    </span>
+                    {% endif %}
+                    {% if not group.day and not group.night %}
+                    <span class="text-muted">No shifts</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if group.day %}
+                    <div class="mb-1">
+                        <small>Day:</small>
+                        <span class="badge {% if group.day.status == 'approved' %}bg-success
+                                         {% elif group.day.status == 'rejected' %}bg-danger
+                                         {% elif group.day.status == 'submitted' %}bg-warning
+                                         {% else %}bg-secondary{% endif %}">
+                            {{ group.day.get_status_display }}
+                        </span>
+                    </div>
+                    {% endif %}
+                    {% if group.night %}
+                    <div>
+                        <small>Night:</small>
+                        <span class="badge {% if group.night.status == 'approved' %}bg-success
+                                         {% elif group.night.status == 'rejected' %}bg-danger
+                                         {% elif group.night.status == 'submitted' %}bg-warning
+                                         {% else %}bg-secondary{% endif %}">
+                            {{ group.night.get_status_display }}
+                        </span>
+                    </div>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if group.day and group.day.client_status %}
+                    <div class="mb-1">
+                        <small>Day:</small>
+                        <span class="badge {% if group.day.client_status == 'client_approved' %}bg-success
+                                           {% elif group.day.client_status == 'client_rejected' %}bg-danger
+                                           {% else %}bg-warning text-dark{% endif %}">
+                            {{ group.day.get_client_status_display }}
+                        </span>
+                    </div>
+                    {% endif %}
+                    {% if group.night and group.night.client_status %}
+                    <div>
+                        <small>Night:</small>
+                        <span class="badge {% if group.night.client_status == 'client_approved' %}bg-success
+                                           {% elif group.night.client_status == 'client_rejected' %}bg-danger
+                                           {% else %}bg-warning text-dark{% endif %}">
+                            {{ group.night.get_client_status_display }}
+                        </span>
+                    </div>
+                    {% endif %}
+                    {% if group.day %}
+                        {% if not group.day.client_status %}
+                            {% if group.night %}
+                                {% if not group.night.client_status %}
+                                <span class="badge bg-secondary">--</span>
+                                {% endif %}
+                            {% else %}
+                            <span class="badge bg-secondary">--</span>
+                            {% endif %}
+                        {% endif %}
+                    {% elif group.night %}
+                        {% if not group.night.client_status %}
+                        <span class="badge bg-secondary">--</span>
+                        {% endif %}
+                    {% else %}
+                    <span class="badge bg-secondary">--</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if group.day %}
+                    <div><small>Day:</small> {{ group.day.created_by.username }}</div>
+                    {% endif %}
+                    {% if group.night %}
+                    <div><small>Night:</small> {{ group.night.created_by.username }}</div>
+                    {% endif %}
+                </td>
+                <td>
+                    <div class="btn-group-vertical">
+                        {% if group.day %}
+                        <a href="{% url 'core:shift_detail' group.day.pk %}" 
+                           class="btn btn-sm btn-outline-primary mb-1">
+                            <i class="bi bi-sun"></i> View Day
+                        </a>
+                        {% endif %}
+                        {% if group.night %}
+                        <a href="{% url 'core:shift_detail' group.night.pk %}" 
+                           class="btn btn-sm btn-outline-dark">
+                            <i class="bi bi-moon"></i> View Night
+                        </a>
+                        {% endif %}
+                    </div>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="8" class="text-center p-4">
+                    <p class="text-muted mb-0">No shifts found.</p>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

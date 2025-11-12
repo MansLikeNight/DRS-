@@ -1,0 +1,640 @@
+/* Professional Dashboard Styles - Inspired by Krux Design */
+
+:root {
+    /* Leos Brand Colors */
+    --leos-primary: #8B1F1F;
+    /* Deep red from logo */
+    --leos-secondary: #2C3E50;
+    /* Dark blue-grey */
+    --leos-accent: #E74C3C;
+    /* Bright red accent */
+    --leos-gold: #C49A6C;
+    /* Gold/bronze accent */
+
+    /* UI Colors */
+    --bg-primary: #EAEEF2;
+    --bg-secondary: #FFFFFF;
+    --bg-dark: #1a1d20;
+    --border-light: #CDD4DB;
+    --border-medium: #95A5B8;
+    --text-primary: #1A202C;
+    --text-secondary: #4A5568;
+    --text-light: #718096;
+
+    /* Shadows */
+    --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.05);
+    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
+    --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.12);
+    --shadow-xl: 0 12px 32px rgba(0, 0, 0, 0.15);
+
+    /* Spacing */
+    --spacing-xs: 0.5rem;
+    --spacing-sm: 1rem;
+    --spacing-md: 1.5rem;
+    --spacing-lg: 2rem;
+    --spacing-xl: 3rem;
+
+    /* Border Radius */
+    --radius-sm: 3px;
+    --radius-md: 5px;
+    --radius-lg: 8px;
+}
+
+/* Typography */
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+    color: var(--text-primary);
+    background-color: var(--bg-primary);
+    line-height: 1.6;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+    font-weight: 600;
+    color: var(--leos-secondary);
+    letter-spacing: -0.02em;
+}
+
+/* Professional Cards */
+.pro-card {
+    background: var(--bg-secondary);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-md);
+    border: 2px solid var(--border-medium);
+    overflow: hidden;
+    transition: all 0.3s ease;
+}
+
+.pro-card:hover {
+    box-shadow: var(--shadow-lg);
+    transform: translateY(-2px);
+}
+
+.pro-card-header {
+    padding: var(--spacing-md) var(--spacing-lg);
+    background: linear-gradient(135deg, var(--leos-primary) 0%, var(--leos-secondary) 100%);
+    color: white;
+    font-weight: 600;
+    font-size: 1.1rem;
+    border-bottom: none;
+}
+
+.pro-card-body {
+    padding: var(--spacing-lg);
+}
+
+/* Metrics Cards (Krux-style) */
+.metric-card {
+    background: white;
+    border-radius: var(--radius-md);
+    padding: var(--spacing-md);
+    box-shadow: var(--shadow-sm);
+    border-left: 4px solid var(--leos-primary);
+    transition: all 0.2s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.metric-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 100px;
+    height: 100px;
+    background: linear-gradient(135deg, transparent 0%, rgba(139, 31, 31, 0.05) 100%);
+    border-radius: 0 0 0 100%;
+}
+
+.metric-card:hover {
+    box-shadow: var(--shadow-md);
+    transform: translateY(-3px);
+    border-left-width: 6px;
+}
+
+.metric-label {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+}
+
+.metric-value {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--leos-primary);
+    line-height: 1;
+}
+
+.metric-change {
+    font-size: 0.875rem;
+    font-weight: 500;
+    margin-top: 0.5rem;
+}
+
+.metric-change.positive {
+    color: #27AE60;
+}
+
+.metric-change.negative {
+    color: #E74C3C;
+}
+
+.metric-icon {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    font-size: 2rem;
+    opacity: 0.1;
+    z-index: 0;
+}
+
+/* Professional Form Inputs */
+.pro-form-group {
+    margin-bottom: var(--spacing-md);
+}
+
+.pro-label {
+    font-size: 0.875rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 0.5rem;
+    display: block;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.pro-input,
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="number"],
+input[type="date"],
+input[type="time"],
+input[type="datetime-local"],
+textarea,
+select {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    border: 2px solid var(--border-light);
+    border-radius: var(--radius-sm);
+    font-size: 0.95rem;
+    transition: all 0.2s ease;
+    background: var(--bg-secondary);
+}
+
+.pro-input:focus,
+input:focus,
+textarea:focus,
+select:focus {
+    outline: none;
+    border-color: var(--leos-primary);
+    box-shadow: 0 0 0 3px rgba(139, 31, 31, 0.1);
+}
+
+.pro-input::placeholder,
+input::placeholder,
+textarea::placeholder {
+    color: var(--text-light);
+}
+
+/* Django form field classes */
+.form-control,
+.form-select {
+    padding: 0.75rem 1rem;
+    border: 2px solid var(--border-light);
+    border-radius: var(--radius-sm);
+    font-size: 0.95rem;
+    transition: all 0.2s ease;
+}
+
+.form-control:focus,
+.form-select:focus {
+    border-color: var(--leos-primary);
+    box-shadow: 0 0 0 3px rgba(139, 31, 31, 0.1);
+}
+
+/* Select Dropdowns */
+.pro-select {
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236C757D' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 1rem center;
+    padding-right: 2.5rem;
+}
+
+/* Professional Buttons */
+.btn-pro-primary {
+    background: linear-gradient(135deg, var(--leos-primary) 0%, var(--leos-accent) 100%);
+    color: white;
+    border: none;
+    padding: 0.75rem 1.5rem;
+    border-radius: var(--radius-sm);
+    font-weight: 600;
+    font-size: 0.95rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    box-shadow: var(--shadow-sm);
+    transition: all 0.3s ease;
+    cursor: pointer;
+}
+
+.btn-pro-primary:hover {
+    box-shadow: var(--shadow-md);
+    transform: translateY(-2px);
+    color: white;
+}
+
+.btn-pro-secondary {
+    background: white;
+    color: var(--leos-primary);
+    border: 2px solid var(--leos-primary);
+    padding: 0.75rem 1.5rem;
+    border-radius: var(--radius-sm);
+    font-weight: 600;
+    font-size: 0.95rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    transition: all 0.3s ease;
+}
+
+.btn-pro-secondary:hover {
+    background: var(--leos-primary);
+    color: white;
+    transform: translateY(-2px);
+}
+
+.btn-pro-add {
+    background: var(--leos-primary);
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: var(--radius-sm);
+    font-weight: 600;
+    font-size: 0.85rem;
+    box-shadow: var(--shadow-sm);
+    transition: all 0.2s ease;
+}
+
+.btn-pro-add:hover {
+    background: var(--leos-accent);
+    box-shadow: var(--shadow-md);
+    transform: translateY(-1px);
+}
+
+/* Responsive Table with Sticky Header */
+.pro-table-container {
+    background: white;
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
+    margin-bottom: var(--spacing-lg);
+}
+
+.pro-table-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--spacing-md) var(--spacing-lg);
+    background: linear-gradient(135deg, var(--leos-secondary) 0%, var(--leos-primary) 100%);
+    color: white;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.pro-table-title {
+    font-size: 1rem;
+    font-weight: 600;
+    margin: 0;
+}
+
+.pro-table-wrapper {
+    max-height: 500px;
+    overflow-y: auto;
+    overflow-x: auto;
+}
+
+.pro-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+.pro-table thead th {
+    position: sticky;
+    top: 0;
+    background: var(--bg-primary);
+    padding: 0.75rem 1rem;
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-secondary);
+    border-bottom: 2px solid var(--border-light);
+    white-space: nowrap;
+    z-index: 5;
+}
+
+.pro-table tbody td {
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--border-light);
+    vertical-align: middle;
+}
+
+.pro-table tbody tr {
+    transition: background-color 0.2s ease;
+}
+
+.pro-table tbody tr:hover {
+    background-color: rgba(139, 31, 31, 0.03);
+}
+
+.pro-table tbody td input,
+.pro-table tbody td select,
+.pro-table tbody td textarea {
+    border: 2px solid var(--border-medium);
+    border-radius: var(--radius-sm);
+    padding: 0.6rem 0.75rem;
+    font-size: 0.95rem;
+    font-weight: 500;
+    color: var(--text-primary);
+    width: 100%;
+    transition: all 0.2s ease;
+}
+
+/* Make hole number field wider and more visible */
+.pro-table tbody td input[name*="hole_number"] {
+    min-width: 120px;
+    font-weight: 600;
+    font-size: 1rem;
+    /* Use standard text color to avoid looking like an error */
+    color: var(--text-primary);
+}
+
+.pro-table tbody td input:focus,
+.pro-table tbody td select:focus,
+.pro-table tbody td textarea:focus {
+    outline: none;
+    border-color: var(--leos-primary);
+    box-shadow: 0 0 0 2px rgba(139, 31, 31, 0.1);
+}
+
+/* Compact table input sizing */
+.pro-table tbody td input[type="number"],
+.pro-table tbody td input[type="time"] {
+    min-width: 100px;
+}
+
+.pro-table tbody td select {
+    min-width: 120px;
+}
+
+.pro-table tbody td textarea {
+    min-width: 150px;
+    min-height: 60px;
+}
+
+/* Login Page */
+.login-container {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, var(--leos-secondary) 0%, var(--leos-primary) 100%);
+    position: relative;
+    overflow: hidden;
+}
+
+.login-container::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 600"><path d="M0 300L50 285C100 270 200 240 300 225C400 210 500 210 600 225C700 240 800 270 900 270C1000 270 1100 240 1150 225L1200 210V600H0V300Z" fill="rgba(255,255,255,0.05)"/></svg>');
+    opacity: 0.5;
+    animation: wave 15s ease-in-out infinite;
+}
+
+@keyframes wave {
+
+    0%,
+    100% {
+        transform: translate(0, 0);
+    }
+
+    50% {
+        transform: translate(-50px, 20px);
+    }
+}
+
+.login-card {
+    background: white;
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-xl);
+    overflow: hidden;
+    width: 100%;
+    max-width: 450px;
+    margin: 2rem;
+    position: relative;
+    z-index: 1;
+}
+
+.login-header {
+    background: linear-gradient(135deg, var(--leos-primary) 0%, var(--leos-secondary) 100%);
+    padding: var(--spacing-xl) var(--spacing-lg);
+    text-align: center;
+    position: relative;
+}
+
+.login-logo {
+    max-width: 200px;
+    height: auto;
+    margin-bottom: 1rem;
+    filter: brightness(0) invert(1);
+}
+
+.login-title {
+    color: white;
+    font-size: 1.75rem;
+    font-weight: 700;
+    margin: 0;
+    letter-spacing: -0.5px;
+}
+
+.login-subtitle {
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 0.95rem;
+    margin-top: 0.5rem;
+}
+
+.login-body {
+    padding: var(--spacing-xl);
+}
+
+.login-form-group {
+    margin-bottom: var(--spacing-md);
+}
+
+.login-input {
+    width: 100%;
+    padding: 1rem;
+    border: 2px solid var(--border-light);
+    border-radius: var(--radius-sm);
+    font-size: 1rem;
+    transition: all 0.2s ease;
+}
+
+.login-input:focus {
+    outline: none;
+    border-color: var(--leos-primary);
+    box-shadow: 0 0 0 4px rgba(139, 31, 31, 0.1);
+}
+
+.login-btn {
+    width: 100%;
+    padding: 1rem;
+    background: linear-gradient(135deg, var(--leos-primary) 0%, var(--leos-accent) 100%);
+    color: white;
+    border: none;
+    border-radius: var(--radius-sm);
+    font-size: 1rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: var(--shadow-md);
+}
+
+.login-btn:hover {
+    box-shadow: var(--shadow-lg);
+    transform: translateY(-2px);
+}
+
+.login-footer {
+    text-align: center;
+    padding: var(--spacing-md);
+    background: var(--bg-primary);
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+}
+
+/* Alert Messages */
+.pro-alert {
+    padding: 1rem 1.25rem;
+    border-radius: var(--radius-sm);
+    margin-bottom: var(--spacing-md);
+    border-left: 4px solid;
+    font-weight: 500;
+}
+
+.pro-alert-success {
+    background: #D4EDDA;
+    color: #155724;
+    border-left-color: #28A745;
+}
+
+.pro-alert-error {
+    background: #F8D7DA;
+    color: #721C24;
+    border-left-color: #DC3545;
+}
+
+.pro-alert-warning {
+    background: #FFF3CD;
+    color: #856404;
+    border-left-color: #FFC107;
+}
+
+.pro-alert-info {
+    background: #D1ECF1;
+    color: #0C5460;
+    border-left-color: #17A2B8;
+}
+
+/* Status Badges */
+.pro-badge {
+    display: inline-block;
+    padding: 0.35rem 0.75rem;
+    border-radius: 50px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.pro-badge-draft {
+    background: #FFF3CD;
+    color: #856404;
+}
+
+.pro-badge-submitted {
+    background: #D1ECF1;
+    color: #0C5460;
+}
+
+.pro-badge-approved {
+    background: #D4EDDA;
+    color: #155724;
+}
+
+.pro-badge-rejected {
+    background: #F8D7DA;
+    color: #721C24;
+}
+
+/* Mobile Responsive */
+@media (max-width: 768px) {
+    .pro-card-body {
+        padding: var(--spacing-md);
+    }
+
+    .pro-table-wrapper {
+        max-height: 400px;
+    }
+
+    .metric-card {
+        margin-bottom: var(--spacing-md);
+    }
+
+    .login-card {
+        margin: 1rem;
+    }
+
+    .login-body {
+        padding: var(--spacing-md);
+    }
+}
+
+/* Loading Spinner */
+.pro-spinner {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border: 3px solid rgba(255, 255, 255, 0.3);
+    border-radius: 50%;
+    border-top-color: white;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Form Section Divider */
+.pro-section-divider {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--border-light), transparent);
+    margin: var(--spacing-lg) 0;
+}

@@ -1,0 +1,57 @@
+{% extends 'core/base.html' %}
+
+{% block title %}Profile - Mini-Krux{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h4 class="card-title mb-0">User Profile</h4>
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    {% csrf_token %}
+                    
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <h5>Account Information</h5>
+                            <dl class="row">
+                                <dt class="col-sm-4">Username</dt>
+                                <dd class="col-sm-8">{{ user.username }}</dd>
+                                
+                                <dt class="col-sm-4">Email</dt>
+                                <dd class="col-sm-8">{{ user.email }}</dd>
+                                
+                                <dt class="col-sm-4">Date Joined</dt>
+                                <dd class="col-sm-8">{{ user.date_joined|date:"F j, Y" }}</dd>
+                            </dl>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <h5>Profile Settings</h5>
+                            {% for field in form %}
+                            <div class="mb-3">
+                                <label for="{{ field.id_for_label }}" class="form-label">{{ field.label }}</label>
+                                {{ field }}
+                                {% if field.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {% for error in field.errors %}
+                                    {{ error }}
+                                    {% endfor %}
+                                </div>
+                                {% endif %}
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    
+                    <div class="d-flex justify-content-end">
+                        <button type="submit" class="btn btn-primary">Update Profile</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

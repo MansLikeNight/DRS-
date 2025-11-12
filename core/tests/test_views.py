@@ -1,0 +1,158 @@
+from django.test import TestCase, Client
+from django.urls import reverse
+from django.contrib.auth import get_user_model
+from django.utils import timezone
+from datetime import date
+from decimal import Decimal
+from core.models import DrillShift, DrillingProgress, ActivityLog, MaterialUsed, ApprovalHistory
+from accounts.models import UserProfile
+
+User = get_user_model()
+
+class ShiftListViewTest(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        # Create users with different roles
+        cls.supervisor = User.objects.create_user(username='supervisor', password='test123')
+        cls.supervisor.profile.role = UserProfile.ROLE_SUPERVISOR
+        cls.supervisor.profile.save()
+        
+        cls.manager = User.objects.create_user(username='manager', password='test123')
+        cls.manager.profile.role = UserProfile.ROLE_MANAGER
+        cls.manager.profile.save()
+        
+        cls.client_user = User.objects.create_user(username='client', password='test123')
+        cls.client_user.profile.role = UserProfile.ROLE_CLIENT
+        cls.client_user.profile.save()
+        
+        # Create some test shifts
+        cls.draft_shift = DrillShift.objects.create(
+            created_by=cls.supervisor,
+            date=date.today(),
+            rig='Rig 1',
+            status=DrillShift.STATUS_DRAFT
+        )
+        
+        cls.submitted_shift = DrillShift.objects.create(
+            created_by=cls.supervisor,
+            date=date.today(),
+            rig='Rig 2',
+            status=DrillShift.STATUS_SUBMITTED
+        )
+        
+        cls.approved_shift = DrillShift.objects.create(
+            created_by=cls.supervisor,
+            date=date.today(),
+            rig='Rig 3',
+            status=DrillShift.STATUS_APPROVED
+        )
+
+    def test_view_url_exists_at_desired_location(self):
+        self.client.login(username='supervisor', password='test123')
+        response = self.client.get('/shifts/')
+        self.assertEqual(response.status_code, 200)
+
+    def test_view_url_accessible_by_name(self):
+        self.client.login(username='supervisor', password='test123')
+        response = self.client.get(reverse('core:shift_list'))
+        self.assertEqual(response.status_code, 200)
+
+    def test_view_uses_correct_template(self):
+        self.client.login(username='supervisor', password='test123')
+        response = self.client.get(reverse('core:shift_list'))
+        self.assertTemplateUsed(response, 'core/shift_list.html')
+
+    def test_client_can_only_see_approved_shifts(self):
+        self.client.login(username='client', password='test123')
+        response = self.client.get(reverse('core:shift_list'))
+        shifts = response.context['shifts']
+        self.assertEqual(shifts.count(), 1)
+        self.assertEqual(shifts.first(), self.approved_shift)
+
+    def test_manager_can_see_submitted_and_approved_shifts(self):
+        self.client.login(username='manager', password='test123')
+        response = self.client.get(reverse('core:shift_list'))
+        shifts = response.context['shifts']
+        self.assertEqual(shifts.count(), 2)
+        self.assertIn(self.submitted_shift, shifts)
+        self.assertIn(self.approved_shift, shifts)
+
+    def test_supervisor_can_see_own_drafts_and_others_submitted(self):
+        self.client.login(username='supervisor', password='test123')
+        response = self.client.get(reverse('core:shift_list'))
+        shifts = response.context['shifts']
+        self.assertEqual(shifts.count(), 3)
+        
+
+class ShiftCreateViewTest(TestCase):
+    def setUp(self):
+        self.supervisor = User.objects.create_user(username='supervisor', password='test123')
+        self.supervisor.profile.role = UserProfile.ROLE_SUPERVISOR
+        self.supervisor.profile.save()
+        
+        self.client_user = User.objects.create_user(username='client', password='test123')
+        self.client_user.profile.role = UserProfile.ROLE_CLIENT
+        self.client_user.profile.save()
+
+    def test_only_supervisor_can_create_shift(self):
+        # Test client cannot access create view
+        self.client.login(username='client', password='test123')
+        response = self.client.get(reverse('core:shift_create'))
+        self.assertEqual(response.status_code, 403)
+
+        # Test supervisor can access create view
+        self.client.login(username='supervisor', password='test123')
+        response = self.client.get(reverse('core:shift_create'))
+        self.assertEqual(response.status_code, 200)
+
+    def test_create_shift_with_formsets(self):
+        self.client.login(username='supervisor', password='test123')
+        data = {
+            'date': '2025-11-03',
+            'rig': 'Test Rig',
+            'location': 'Test Location',
+            'notes': 'Test notes',
+            
+            # Progress formset
+            'progress-TOTAL_FORMS': '1',
+            'progress-INITIAL_FORMS': '0',
+            'progress-MIN_NUM_FORMS': '0',
+            'progress-MAX_NUM_FORMS': '1000',
+            'progress-0-start_depth': '10.00',
+            'progress-0-end_depth': '15.50',
+            'progress-0-meters_drilled': '5.50',
+            'progress-0-penetration_rate': '2.75',
+            
+            # Activity formset
+            'activity-TOTAL_FORMS': '1',
+            'activity-INITIAL_FORMS': '0',
+            'activity-MIN_NUM_FORMS': '0',
+            'activity-MAX_NUM_FORMS': '1000',
+            'activity-0-activity_type': 'drilling',
+            'activity-0-description': 'Test drilling',
+            'activity-0-duration_minutes': '120',
+            
+            # Material formset
+            'material-TOTAL_FORMS': '1',
+            'material-INITIAL_FORMS': '0',
+            'material-MIN_NUM_FORMS': '0',
+            'material-MAX_NUM_FORMS': '1000',
+            'material-0-material_name': 'Diesel',
+            'material-0-quantity': '100.00',
+            'material-0-unit': 'liters',
+        }
+        
+        response = self.client.post(reverse('core:shift_create'), data)
+        self.assertEqual(response.status_code, 302)  # Redirect on success
+        
+        # Check if shift was created
+        shift = DrillShift.objects.first()
+        self.assertIsNotNone(shift)
+        self.assertEqual(shift.rig, 'Test Rig')
+        self.assertEqual(shift.created_by, self.supervisor)
+        self.assertEqual(shift.status, DrillShift.STATUS_DRAFT)
+        
+        # Check related objects
+        self.assertEqual(shift.progress.count(), 1)
+        self.assertEqual(shift.activities.count(), 1)
+        self.assertEqual(shift.materials.count(), 1)
