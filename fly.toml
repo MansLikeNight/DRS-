@@ -3,6 +3,9 @@
 app = "drs2342"
 
 [build]
+  builder = "paketobuildpacks/builder:base"
+  buildpacks = ["gcr.io/paketo-buildpacks/python"]
+  
   [build.args]
     # Force mise to compile Python instead of using broken precompiled binaries
     MISE_PYTHON_COMPILE = "1"
