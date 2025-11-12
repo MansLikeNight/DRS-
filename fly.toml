@@ -1,0 +1,38 @@
+# Fly.io configuration for Daily Drill Report System
+
+app = "your-app-name"  # Replace with your actual Fly.io app name
+
+[build]
+  [build.args]
+    # Force mise to compile Python instead of using broken precompiled binaries
+    MISE_PYTHON_COMPILE = "1"
+    MISE_SETTINGS__PYTHON_COMPILE = "1"
+
+[env]
+  # Force mise to compile Python from source
+  MISE_PYTHON_COMPILE = "1"
+  MISE_SETTINGS__PYTHON_COMPILE = "1"
+  
+  # Django settings (you'll need to set these as secrets)
+  # SECRET_KEY - set via: fly secrets set SECRET_KEY="your-secret-key"
+  # DEBUG = "False"
+  # ALLOWED_HOSTS - will be auto-set by Fly.io
+
+[http_service]
+  internal_port = 8000
+  force_https = true
+  auto_stop_machines = true
+  auto_start_machines = true
+  min_machines_running = 0
+
+[[services]]
+  protocol = "tcp"
+  internal_port = 8000
+
+  [[services.ports]]
+    port = 80
+    handlers = ["http"]
+
+  [[services.ports]]
+    port = 443
+    handlers = ["tls", "http"]
