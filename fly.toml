@@ -1,6 +1,6 @@
 # Fly.io configuration for Daily Drill Report System
 
-app = "your-app-name"  # Replace with your actual Fly.io app name
+app = "drs2342"
 
 [build]
   [build.args]
