@@ -1,7 +1,10 @@
-# Mise configuration for Fly.io builds
-# Force compiling Python if prebuilt extraction fails
+# Mise configuration for DRS- project
+# Force compiling Python from source to avoid precompiled binary extraction failures
+# The precompiled Python binaries from indygreg/python-build-standalone (.tar.zst)
+# can fail with "invalid gzip header" errors on some systems.
+# Setting python_compile=true forces mise to compile from source instead.
 [tools]
-python = "3.12.6"
+python = "3.12.12"
 
 [settings]
 python_compile = true
