@@ -261,7 +261,8 @@ python manage.py loaddata core_backup.json
 ## 🆘 Troubleshooting
 
 ### Fly.io build fails with mise invalid gzip header
-If your Fly.io deployment fails with errors like:
+
+If your Fly.io deployment or local mise install fails with errors like:
 
 ```
 mise failed to extract tar ... .tar.zst
@@ -269,25 +270,25 @@ mise failed to iterate over archive
 mise invalid gzip header
 ```
 
-This comes from the precompiled Python archive (zstd compressed) failing to extract in the builder. Fix by pinning Python and forcing compile mode:
+This is caused by broken or incompatible precompiled Python binaries (zstd compressed) from indygreg/python-build-standalone. Fix by pinning Python and forcing source compilation:
 
-1) Pin Python version in `runtime.txt` to a stable release supported by your stack (we use 3.12.6):
+1) Pin Python version in `runtime.txt` to a supported release (use 3.12.12 for best compatibility):
 
 ```
-python-3.12.6
+python-3.12.12
 ```
 
-2) Add `.mise.toml` to force compilation instead of prebuilt tarballs:
+2) Add or update `.mise.toml` to force compilation:
 
 ```
 [tools]
-python = "3.12.6"
+python = "3.12.12"
 
 [settings]
 python_compile = true
 ```
 
-Commit and push, then redeploy on Fly. Compilation is slower but avoids the prebuilt extraction step that fails.
+Commit and push, then redeploy on Fly or rerun `mise use -g python@3.12.12` locally. Compilation is slower but avoids the broken prebuilt extraction step.
 
 ### Static files not loading
 ```bash
