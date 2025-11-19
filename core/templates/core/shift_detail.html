@@ -87,9 +87,7 @@
                     <small>07:00 - 19:00 (12 hours)</small>
                 </div>
                 <div class="card-body">
-                    {% if shift.shift_type == 'day' or companion_shift.shift_type == 'day' %}
-                        {% with day_shift=shift|default:companion_shift %}
-                        {% if shift.shift_type == 'day' %}
+                    {% if shift.shift_type == 'day' %}
                                 <h2 class="display-6 mb-0">{{ total_24h_meters|floatformat:2 }}m drilled</h2>
                             <div class="row text-center mb-3">
                                 <div class="col-4">
@@ -127,12 +125,10 @@
                             <button class="btn btn-outline-primary btn-sm w-100" type="button" data-bs-toggle="collapse" data-bs-target="#dayShiftDetails">
                                 <i class="bi bi-chevron-down"></i> View Full Details
                             </button>
-                            {% endwith %}
                         {% elif companion_shift and companion_shift.shift_type == 'day' %}
-                            {% with day_meters=companion_meters %}
                             <div class="row text-center mb-3">
                                 <div class="col-4">
-                                    <h4 class="text-primary">{{ day_meters|floatformat:2 }}m</h4>
+                                    <h4 class="text-primary">{{ companion_meters|floatformat:2 }}m</h4>
                                     <small class="text-muted">Meters Drilled</small>
                                 </div>
                                 <div class="col-4">
@@ -165,10 +161,7 @@
                             <a href="{% url 'core:shift_detail' companion_shift.pk %}" class="btn btn-primary btn-sm w-100">
                                 <i class="bi bi-eye"></i> View This Shift
                             </a>
-                            {% endwith %}
-                        {% endif %}
-                        {% endwith %}
-                    {% else %}
+                        {% else %}
                     <div class="text-center text-muted py-4">
                         <i class="bi bi-sun" style="font-size: 3rem;"></i>
                         <p>No day shift recorded for {{ shift.date|date:"Y-m-d" }}</p>
