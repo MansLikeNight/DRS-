@@ -28,8 +28,8 @@ RUN python manage.py collectstatic --noinput
 # Expose port
 EXPOSE 8000
 
-# Create a startup script that runs migrations before starting gunicorn
-RUN echo '#!/bin/bash\npython manage.py migrate --noinput\nexec gunicorn DailyDrillReport.wsgi:application --bind 0.0.0.0:$PORT --workers 4 --timeout 120' > /app/start.sh && chmod +x /app/start.sh
+# Create a startup script that runs migrations and creates superuser before starting gunicorn
+RUN echo '#!/bin/bash\npython manage.py migrate --noinput\npython manage.py create_superuser_auto\nexec gunicorn DailyDrillReport.wsgi:application --bind 0.0.0.0:$PORT --workers 4 --timeout 120' > /app/start.sh && chmod +x /app/start.sh
 
 # Run startup script
 CMD ["/app/start.sh"]
