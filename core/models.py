@@ -91,6 +91,15 @@ class DrillShift(models.Model):
     shift_type = models.CharField(max_length=16, choices=SHIFT_TYPE_CHOICES, default=SHIFT_DAY)
     rig = models.CharField(max_length=128, blank=True)
     location = models.CharField(max_length=255, blank=True)
+
+    # Project / Commercial tracking
+    project_code = models.CharField(max_length=64, blank=True, help_text="Internal project or contract code")
+    purchase_order_number = models.CharField(max_length=64, blank=True, help_text="Client PO / authorization reference")
+
+    # KPI Targets (optional for off-target calculations)
+    target_recovery_pct = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True, help_text="Target recovery percentage for this project")
+    target_rop = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True, help_text="Target average rate of penetration (m/hr)")
+    target_meters_per_shift = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True, help_text="Target meters drilled per shift")
     
     # Staff information
     supervisor_name = models.CharField(max_length=255, blank=True, help_text="Shift Supervisor")
@@ -104,6 +113,10 @@ class DrillShift(models.Model):
     end_time = models.TimeField(null=True, blank=True)
     notes = models.TextField(blank=True)
     status = models.CharField(max_length=16, choices=STATUS_CHOICES, default=STATUS_DRAFT)
+
+    # Workflow timestamps
+    submitted_at = models.DateTimeField(null=True, blank=True, help_text="Timestamp when shift was first submitted")
+    manager_approved_at = models.DateTimeField(null=True, blank=True, help_text="Timestamp when manager approved shift")
     
     # Standby tracking
     STANDBY_CLIENT_REASONS = [
@@ -148,6 +161,7 @@ class DrillShift(models.Model):
         indexes = [
             models.Index(fields=['date']),
             models.Index(fields=['status']),
+            models.Index(fields=['project_code']),
         ]
 
     def __str__(self):
@@ -459,3 +473,82 @@ class ApprovalHistory(models.Model):
 
     def __str__(self):
         return f"{self.shift_id} - {self.decision} by {self.approver_id} @ {self.timestamp:%Y-%m-%d %H:%M}"
+
+
+class Alert(models.Model):
+    """
+    System alerts for drilling operations requiring manager attention.
+    
+    Automatically generated when certain thresholds are breached:
+    - Recovery below 70%
+    - ROP drop > 30% vs previous shift
+    - Excessive downtime (>4 hours)
+    - Bit failure indicators
+    
+    Attributes:
+        shift: Related drill shift that triggered the alert
+        alert_type: Type of alert (recovery/rop_drop/downtime/bit_failure)
+        severity: Alert severity level (low/medium/high/critical)
+        title: Short alert title
+        description: Detailed alert description
+        value: Numerical value related to the alert (e.g., recovery %, ROP drop %)
+        threshold: The threshold that was breached
+        is_active: Whether alert is still active/unresolved
+        is_acknowledged: Whether a manager has acknowledged the alert
+        acknowledged_by: Manager who acknowledged the alert
+        acknowledged_at: When the alert was acknowledged
+        created_at: When the alert was created
+    """
+    ALERT_RECOVERY = 'recovery'
+    ALERT_ROP_DROP = 'rop_drop'
+    ALERT_DOWNTIME = 'downtime'
+    ALERT_BIT_FAILURE = 'bit_failure'
+    
+    ALERT_TYPE_CHOICES = [
+        (ALERT_RECOVERY, 'Low Core Recovery'),
+        (ALERT_ROP_DROP, 'ROP Drop'),
+        (ALERT_DOWNTIME, 'Excessive Downtime'),
+        (ALERT_BIT_FAILURE, 'Bit Failure Warning'),
+    ]
+    
+    SEVERITY_LOW = 'low'
+    SEVERITY_MEDIUM = 'medium'
+    SEVERITY_HIGH = 'high'
+    SEVERITY_CRITICAL = 'critical'
+    
+    SEVERITY_CHOICES = [
+        (SEVERITY_LOW, 'Low'),
+        (SEVERITY_MEDIUM, 'Medium'),
+        (SEVERITY_HIGH, 'High'),
+        (SEVERITY_CRITICAL, 'Critical'),
+    ]
+    
+    shift = models.ForeignKey(DrillShift, on_delete=models.CASCADE, related_name='alerts')
+    alert_type = models.CharField(max_length=32, choices=ALERT_TYPE_CHOICES)
+    severity = models.CharField(max_length=16, choices=SEVERITY_CHOICES, default=SEVERITY_MEDIUM)
+    title = models.CharField(max_length=255)
+    description = models.TextField()
+    value = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, help_text="Alert value (%, hours, etc)")
+    threshold = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, help_text="Threshold breached")
+    is_active = models.BooleanField(default=True)
+    is_acknowledged = models.BooleanField(default=False)
+    acknowledged_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name='acknowledged_alerts')
+    acknowledged_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(default=timezone.now)
+    
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['alert_type', 'is_active']),
+            models.Index(fields=['severity', 'is_active']),
+        ]
+    
+    def __str__(self):
+        return f"{self.get_alert_type_display()} - {self.shift} ({self.get_severity_display()})"
+    
+    def acknowledge(self, user):
+        """Mark alert as acknowledged by a manager."""
+        self.is_acknowledged = True
+        self.acknowledged_by = user
+        self.acknowledged_at = timezone.now()
+        self.save()

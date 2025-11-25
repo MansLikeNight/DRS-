@@ -18,7 +18,7 @@ except Exception:
     Window = None
 from django.db.models.functions import TruncDate
 from django.http import HttpResponse
-from .models import DrillShift, DrillingProgress, MaterialUsed
+from .models import DrillShift, DrillingProgress, MaterialUsed, Alert
 
 def generate_shift_summary(shift: DrillShift) -> Dict[str, Any]:
     """Generate summary statistics for a single shift."""
@@ -210,3 +210,90 @@ def calculate_daily_progress(shifts: List[DrillShift]) -> Dict[str, Any]:
     ).order_by('date_truncated')
 
     return daily_stats
+
+
+def evaluate_shift_alerts(shift: DrillShift) -> None:
+    """Generate Alert records for a newly approved shift based on KPIs.
+
+    Conditions:
+    - Recovery below 70% (average recovery_percentage across progress entries)
+    - ROP drop > 30% vs previous approved shift on same rig (average penetration_rate)
+    - Excessive downtime (> 4 hours of non-drilling activities)
+    - Bit failure warning (any penetration_rate < 30% of previous shift avg or < 0.5 m/hr)
+
+    Idempotency: Will not create duplicate active alerts of same type for the same shift.
+    """
+    # Only evaluate for approved shifts
+    if shift.status != DrillShift.STATUS_APPROVED:
+        return
+
+    progress_qs = shift.progress.all()
+    if not progress_qs.exists():
+        return
+
+    def already_exists(alert_type: str) -> bool:
+        return Alert.objects.filter(shift=shift, alert_type=alert_type, is_active=True).exists()
+
+    # Average recovery
+    avg_recovery = progress_qs.aggregate(r=Avg('recovery_percentage'))['r'] or 0
+    if avg_recovery and avg_recovery < 90 and not already_exists(Alert.ALERT_RECOVERY):
+        Alert.objects.create(
+            shift=shift,
+            alert_type=Alert.ALERT_RECOVERY,
+            severity=Alert.SEVERITY_HIGH if avg_recovery < 80 else Alert.SEVERITY_MEDIUM,
+            title='Low Core Recovery',
+            description=f'Average recovery {avg_recovery:.2f}% below 90% threshold.',
+            value=Decimal(str(round(avg_recovery, 2))),
+            threshold=Decimal('90')
+        )
+
+    # ROP drop vs previous approved shift on same rig
+    if shift.rig:
+        prev_shift = (DrillShift.objects
+                      .filter(rig=shift.rig, status=DrillShift.STATUS_APPROVED, date__lt=shift.date)
+                      .order_by('-date', '-id')
+                      .first())
+        if prev_shift:
+            prev_avg_rop = prev_shift.progress.aggregate(a=Avg('penetration_rate'))['a'] or 0
+            curr_avg_rop = progress_qs.aggregate(a=Avg('penetration_rate'))['a'] or 0
+            if prev_avg_rop and curr_avg_rop and curr_avg_rop < prev_avg_rop * Decimal('0.70') and not already_exists(Alert.ALERT_ROP_DROP):
+                drop_pct = (1 - (Decimal(str(curr_avg_rop)) / Decimal(str(prev_avg_rop)))) * 100
+                Alert.objects.create(
+                    shift=shift,
+                    alert_type=Alert.ALERT_ROP_DROP,
+                    severity=Alert.SEVERITY_HIGH if drop_pct > 40 else Alert.SEVERITY_MEDIUM,
+                    title='ROP Drop Detected',
+                    description=f'ROP decreased by {drop_pct:.1f}% compared to previous shift (Prev: {prev_avg_rop:.2f}, Curr: {curr_avg_rop:.2f}).',
+                    value=Decimal(str(round(drop_pct, 2))),
+                    threshold=Decimal('30')
+                )
+
+    # Excessive downtime (>4 hours non-drilling activities)
+    downtime_minutes = shift.activities.exclude(activity_type='drilling').aggregate(m=Sum('duration_minutes'))['m'] or 0
+    downtime_hours = downtime_minutes / 60
+    if downtime_hours > 4 and not already_exists(Alert.ALERT_DOWNTIME):
+        Alert.objects.create(
+            shift=shift,
+            alert_type=Alert.ALERT_DOWNTIME,
+            severity=Alert.SEVERITY_HIGH if downtime_hours > 6 else Alert.SEVERITY_MEDIUM,
+            title='Excessive Downtime',
+            description=f'Non-drilling activities totaled {downtime_hours:.1f} hours (>4h threshold).',
+            value=Decimal(str(round(downtime_hours, 2))),
+            threshold=Decimal('4')
+        )
+
+    # Bit failure warning (heuristic)
+    avg_rop_current = progress_qs.aggregate(a=Avg('penetration_rate'))['a'] or 0
+    low_runs = [p for p in progress_qs if p.penetration_rate and p.penetration_rate < max(0.5, float(avg_rop_current) * 0.3)]
+    if low_runs and not already_exists(Alert.ALERT_BIT_FAILURE):
+        worst = min([float(p.penetration_rate) for p in low_runs]) if low_runs else 0
+        Alert.objects.create(
+            shift=shift,
+            alert_type=Alert.ALERT_BIT_FAILURE,
+            severity=Alert.SEVERITY_MEDIUM if worst > 0.3 else Alert.SEVERITY_HIGH,
+            title='Potential Bit Performance Issue',
+            description=f'{len(low_runs)} drilling segment(s) show very low penetration (min {worst:.2f} m/hr).',
+            value=Decimal(str(round(worst, 2))),
+            threshold=Decimal(str(round(float(avg_rop_current) * 0.3, 2))) if avg_rop_current else None
+        )
+

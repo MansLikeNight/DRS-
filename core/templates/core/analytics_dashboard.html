@@ -1,0 +1,216 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block title %}Analytics Dashboard - Leos Investments Ltd{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <h2 class="mb-3"><i class="bi bi-graph-up"></i> Analytics & Trends</h2>
+    </div>
+</div>
+
+<!-- KPI Summary Row -->
+<div class="row g-3 mb-4">
+  <div class="col-6 col-lg-3">
+    <div class="card kpi-card h-100">
+      <div class="card-body text-center">
+        <div class="kpi-icon text-primary"><i class="bi bi-calendar-range"></i></div>
+        <div class="kpi-value text-primary">{{ start_date|date:"M d" }} - {{ end_date|date:"M d" }}</div>
+        <div class="kpi-label">Date Range</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="card kpi-card h-100">
+      <div class="card-body text-center">
+        <div class="kpi-icon text-success"><i class="bi bi-graph-up-arrow"></i></div>
+        <div class="kpi-value text-success">30 Days</div>
+        <div class="kpi-label">Trend Period</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="card kpi-card h-100">
+      <div class="card-body text-center">
+        <div class="kpi-icon text-info"><i class="bi bi-bar-chart-line"></i></div>
+        <div class="kpi-value text-info">6 Charts</div>
+        <div class="kpi-label">Metrics Tracked</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="card kpi-card h-100">
+      <div class="card-body text-center">
+        <div class="kpi-icon text-warning"><i class="bi bi-lightning"></i></div>
+        <div class="kpi-value text-warning">Live</div>
+        <div class="kpi-label">Data Status</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Date Range Filter -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <form method="get" class="row g-3 align-items-end">
+                    <div class="col-md-4">
+                        <label for="start_date" class="form-label">Start Date</label>
+                        <input type="date" class="form-control" id="start_date" name="start_date" value="{{ start_date|date:'Y-m-d' }}">
+                    </div>
+                    <div class="col-md-4">
+                        <label for="end_date" class="form-label">End Date</label>
+                        <input type="date" class="form-control" id="end_date" name="end_date" value="{{ end_date|date:'Y-m-d' }}">
+                    </div>
+                    <div class="col-md-4">
+                        <button type="submit" class="btn btn-primary w-100">
+                            <i class="bi bi-funnel"></i> Apply Filter
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Daily Meters Trend -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card shadow-sm">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="bi bi-bar-chart-line"></i> Daily Meters Drilled</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="metersChart" height="80"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ROP and Recovery Trends -->
+<div class="row g-3 mb-4">
+    <!-- ROP Trend -->
+    <div class="col-12 col-lg-6">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-info text-white">
+                <h5 class="mb-0"><i class="bi bi-speedometer"></i> ROP Trend (m/hr)</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="ropChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recovery Trend -->
+    <div class="col-12 col-lg-6">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-warning text-white">
+                <h5 class="mb-0"><i class="bi bi-percent"></i> Core Recovery Trend (%)</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="recoveryChart"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Downtime Breakdown (Pie) -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card shadow-sm">
+            <div class="card-header bg-danger contrast-header">
+                <h5 class="mb-0"><i class="bi bi-clock-history"></i> Downtime Breakdown (Hours)</h5>
+            </div>
+            <div class="card-body">
+                {% if downtime_has_data %}
+                <div style="max-width:600px;margin:0 auto;">
+                    <canvas id="downtimePieChart" height="240"></canvas>
+                </div>
+                {% else %}
+                <p class="text-muted text-center mb-0"><i class="bi bi-check-circle"></i> No downtime recorded in this range.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Materials and Bit Performance -->
+<div class="row g-3 mb-4">
+    <!-- Material Usage -->
+    <div class="col-12 col-lg-6">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0"><i class="bi bi-box-seam"></i> Top Materials Used</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="materialsChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bit Performance -->
+    <div class="col-12 col-lg-6">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-secondary text-white">
+                <h5 class="mb-0"><i class="bi bi-gear"></i> Bit Size Performance</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="bitChart"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Monthly Rig Performance -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card shadow-sm">
+            <div class="card-header bg-dark text-white">
+                <h5 class="mb-0"><i class="bi bi-truck"></i> Monthly Rig Performance (Multi-Axis)</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="rigMonthChart" height="80"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Back to Home -->
+<div class="row">
+    <div class="col-12">
+        <a href="{% url 'core:home_dashboard' %}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Back to Home
+        </a>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<!-- Embedded JSON data for external JS parsing -->
+<script type="application/json" id="meters-dates-json">{{ meters_dates|safe }}</script>
+<script type="application/json" id="meters-values-json">{{ meters_values|safe }}</script>
+<script type="application/json" id="rop-dates-json">{{ rop_dates|safe }}</script>
+<script type="application/json" id="rop-values-json">{{ rop_values|safe }}</script>
+<script type="application/json" id="recovery-dates-json">{{ recovery_dates|safe }}</script>
+<script type="application/json" id="recovery-values-json">{{ recovery_values|safe }}</script>
+<script type="application/json" id="downtime-dates-json">{{ downtime_dates|safe }}</script>
+<script type="application/json" id="downtime-datasets-json">{{ downtime_datasets|safe }}</script>
+<script type="application/json" id="downtime-activity-labels-json">{{ downtime_activity_labels|safe }}</script>
+<script type="application/json" id="downtime-activity-values-json">{{ downtime_activity_values|safe }}</script>
+<script type="application/json" id="material-labels-json">{{ material_labels|safe }}</script>
+<script type="application/json" id="material-values-json">{{ material_values|safe }}</script>
+<script type="application/json" id="bit-labels-json">{{ bit_labels|safe }}</script>
+<script type="application/json" id="bit-meters-json">{{ bit_meters|safe }}</script>
+<script type="application/json" id="bit-recovery-json">{{ bit_recovery|safe }}</script>
+<script type="application/json" id="rig-month-labels-json">{{ rig_month_labels|safe }}</script>
+<script type="application/json" id="rig-month-meters-json">{{ rig_month_meters|safe }}</script>
+<script type="application/json" id="rig-month-recovery-json">{{ rig_month_recovery|safe }}</script>
+<script type="application/json" id="rig-month-rop-json">{{ rig_month_rop|safe }}</script>
+<script src="{% static 'core/js/analytics_dashboard.js' %}"></script>
+{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'core/css/dashboard.css' %}">
+{% endblock %}

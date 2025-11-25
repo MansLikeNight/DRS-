@@ -1,0 +1,50 @@
+[
+{
+  "model": "accounts.userprofile",
+  "pk": 1,
+  "fields": {
+    "user": [
+      "Twambo"
+    ],
+    "role": "supervisor",
+    "company": "",
+    "phone": ""
+  }
+},
+{
+  "model": "accounts.userprofile",
+  "pk": 2,
+  "fields": {
+    "user": [
+      "busiku"
+    ],
+    "role": "supervisor",
+    "company": "",
+    "phone": ""
+  }
+},
+{
+  "model": "accounts.userprofile",
+  "pk": 3,
+  "fields": {
+    "user": [
+      "lolololol"
+    ],
+    "role": "supervisor",
+    "company": "",
+    "phone": ""
+  }
+},
+{
+  "model": "accounts.userprofile",
+  "pk": 4,
+  "fields": {
+    "user": [
+      "goviex"
+    ],
+    "role": "client",
+    "company": "",
+    "phone": ""
+  }
+}
+]

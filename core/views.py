@@ -1,13 +1,15 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from django.db.models import Sum, Avg, Q
+from django.db.models import Sum, Avg, Q, Count, F
 from django.urls import reverse
 from django.core.exceptions import PermissionDenied
-from django.http import HttpResponse, FileResponse
+from django.http import HttpResponse, FileResponse, JsonResponse
 from django.utils import timezone
-from .models import DrillShift, DrillingProgress, ActivityLog, MaterialUsed, ApprovalHistory, Client
+from decimal import Decimal
+import json
+from .models import DrillShift, DrillingProgress, ActivityLog, MaterialUsed, ApprovalHistory, Client, Alert
 from .forms import (DrillShiftForm, DrillingProgressFormSet, ActivityLogFormSet, 
                     MaterialUsedFormSet, SurveyFormSet, CasingFormSet)
 from .utils import export_shifts_to_csv, export_monthly_boq, calculate_daily_progress
@@ -16,6 +18,404 @@ from accounts.decorators import (
     supervisor_required, manager_required, supervisor_or_manager_required,
     can_approve_shifts
 )
+
+
+@login_required
+def home_dashboard(request):
+    """
+    Manager-focused home dashboard showing high-level KPIs and alerts.
+    
+    Displays:
+    - Total meters drilled today and this month
+    - Average ROP and core recovery (last 24 hours)
+    - Downtime summary by category
+    - Rig performance comparison (meters per rig, last 24h)
+    - Top 3 issues from recent shift comments
+    - Active system alerts
+    
+    Returns:
+        Rendered home dashboard template with KPIs and chart data
+    """
+    today = timezone.now().date()
+    yesterday = today - timedelta(days=1)
+    month_start = today.replace(day=1)
+    last_24h = timezone.now() - timedelta(hours=24)
+    
+    # KPI 1: Total meters drilled today
+    meters_today = DrillingProgress.objects.filter(
+        shift__date=today,
+        shift__status=DrillShift.STATUS_APPROVED
+    ).aggregate(total=Sum('meters_drilled'))['total'] or 0
+    
+    # KPI 2: Total meters this month
+    meters_month = DrillingProgress.objects.filter(
+        shift__date__gte=month_start,
+        shift__status=DrillShift.STATUS_APPROVED
+    ).aggregate(total=Sum('meters_drilled'))['total'] or 0
+    
+    # KPI 3: Average ROP (last 24 hours)
+    avg_rop_24h = DrillingProgress.objects.filter(
+        shift__date__gte=yesterday,
+        shift__status=DrillShift.STATUS_APPROVED,
+        penetration_rate__isnull=False
+    ).aggregate(avg=Avg('penetration_rate'))['avg'] or 0
+    
+    # KPI 4: Average core recovery (last 24 hours)
+    avg_recovery_24h = DrillingProgress.objects.filter(
+        shift__date__gte=yesterday,
+        shift__status=DrillShift.STATUS_APPROVED,
+        recovery_percentage__isnull=False
+    ).aggregate(avg=Avg('recovery_percentage'))['avg'] or 0
+    
+    # KPI 5: Downtime summary by category (last 24h)
+    downtime_data = ActivityLog.objects.filter(
+        shift__date__gte=yesterday,
+        shift__status=DrillShift.STATUS_APPROVED
+    ).values('activity_type').annotate(
+        total_hours=Sum('duration_minutes') / 60
+    ).order_by('-total_hours')
+    
+    # KPI 6: Rig performance comparison (last 24h)
+    rig_performance = DrillingProgress.objects.filter(
+        shift__date__gte=yesterday,
+        shift__status=DrillShift.STATUS_APPROVED,
+        shift__rig__isnull=False
+    ).exclude(
+        shift__rig=''
+    ).values('shift__rig').annotate(
+        total_meters=Sum('meters_drilled')
+    ).order_by('-total_meters')[:10]  # Top 10 rigs
+    
+    # KPI 7: Top 3 issues from latest shifts
+    recent_shifts_with_issues = DrillShift.objects.filter(
+        status=DrillShift.STATUS_APPROVED,
+        notes__isnull=False
+    ).exclude(
+        notes=''
+    ).order_by('-date', '-id')[:5]
+    
+    top_issues = []
+    for shift in recent_shifts_with_issues:
+        if shift.notes and len(shift.notes.strip()) > 10:
+            top_issues.append({
+                'date': shift.date,
+                'rig': shift.rig,
+                'issue': shift.notes[:200],  # Truncate long notes
+                'shift_id': shift.id
+            })
+            if len(top_issues) >= 3:
+                break
+    
+    # Get active alerts (before slicing for counting)
+    active_alerts_qs = Alert.objects.filter(
+        is_active=True,
+        is_acknowledged=False
+    ).select_related('shift').order_by('-severity', '-created_at')
+    
+    # Count alerts by severity (before slicing)
+    alert_counts = {
+        'critical': active_alerts_qs.filter(severity=Alert.SEVERITY_CRITICAL).count(),
+        'high': active_alerts_qs.filter(severity=Alert.SEVERITY_HIGH).count(),
+        'medium': active_alerts_qs.filter(severity=Alert.SEVERITY_MEDIUM).count(),
+        'low': active_alerts_qs.filter(severity=Alert.SEVERITY_LOW).count(),
+    }
+    
+    # Get top 10 for display
+    active_alerts = active_alerts_qs[:10]
+    
+    # Prepare chart data for Chart.js
+    downtime_labels = [item['activity_type'] for item in downtime_data]
+    downtime_values = [float(item['total_hours']) for item in downtime_data]
+    
+    # Get rig performance data separately for recovery calculation
+    rig_perf_with_recovery = DrillingProgress.objects.filter(
+        shift__date__gte=yesterday,
+        shift__status=DrillShift.STATUS_APPROVED,
+        shift__rig__isnull=False
+    ).exclude(
+        shift__rig=''
+    ).values('shift__rig').annotate(
+        total_meters=Sum('meters_drilled'),
+        avg_recovery=Avg('recovery_percentage')
+    ).order_by('-total_meters')[:10]
+    
+    rig_labels = [item['shift__rig'] for item in rig_perf_with_recovery]
+    rig_values = [float(item['total_meters']) for item in rig_perf_with_recovery]
+    rig_recovery = [float(item['avg_recovery']) if item['avg_recovery'] else 0 for item in rig_perf_with_recovery]
+    
+    # Client/Project Performance (last 30 days)
+    client_performance = DrillingProgress.objects.filter(
+        shift__date__gte=month_start,
+        shift__status=DrillShift.STATUS_APPROVED,
+        shift__client__isnull=False
+    ).values('shift__client__name').annotate(
+        total_meters=Sum('meters_drilled'),
+        avg_recovery=Avg('recovery_percentage'),
+        avg_rop=Avg('penetration_rate'),
+        shift_count=Count('shift', distinct=True)
+    ).order_by('-total_meters')
+    
+    # Location/Project performance
+    location_performance = DrillingProgress.objects.filter(
+        shift__date__gte=month_start,
+        shift__status=DrillShift.STATUS_APPROVED,
+        shift__location__isnull=False
+    ).exclude(
+        shift__location=''
+    ).values('shift__location').annotate(
+        total_meters=Sum('meters_drilled'),
+        avg_recovery=Avg('recovery_percentage'),
+        shift_count=Count('shift', distinct=True)
+    ).order_by('-total_meters')[:10]
+    
+    # Workflow status metrics (this month)
+    shifts_month_qs = DrillShift.objects.filter(date__gte=month_start)
+    draft_count = shifts_month_qs.filter(status=DrillShift.STATUS_DRAFT).count()
+    submitted_count = shifts_month_qs.filter(status=DrillShift.STATUS_SUBMITTED).count()
+    approved_count = shifts_month_qs.filter(status=DrillShift.STATUS_APPROVED).count()
+    rejected_count = shifts_month_qs.filter(status=DrillShift.STATUS_REJECTED).count()
+
+    # Active clients (distinct clients with approved shifts this month)
+    active_clients_count = DrillShift.objects.filter(
+        date__gte=month_start,
+        status=DrillShift.STATUS_APPROVED,
+        client__isnull=False
+    ).values('client').distinct().count()
+
+    # Client workflow metrics (approved shifts only)
+    client_pending_count = shifts_month_qs.filter(status=DrillShift.STATUS_APPROVED, client_status=DrillShift.CLIENT_PENDING).count()
+    client_approved_count = shifts_month_qs.filter(status=DrillShift.STATUS_APPROVED, client_status=DrillShift.CLIENT_APPROVED).count()
+    client_rejected_count = shifts_month_qs.filter(status=DrillShift.STATUS_APPROVED, client_status=DrillShift.CLIENT_REJECTED).count()
+
+    # Off-target KPIs derived from recent alerts (high+critical active)
+    off_target_alerts = Alert.objects.filter(is_active=True, severity__in=[Alert.SEVERITY_HIGH, Alert.SEVERITY_CRITICAL]).select_related('shift').order_by('-created_at')[:8]
+
+    # Placeholder average days metrics (requires timestamps/more history) - derive from approval history if available
+    from django.db.models import Min
+    approvals = ApprovalHistory.objects.filter(shift__in=shifts_month_qs, decision=ApprovalHistory.DECISION_APPROVED).values('shift_id').annotate(first_approved=Min('timestamp'))
+    # Map for quick lookup
+    approved_map = {a['shift_id']: a['first_approved'] for a in approvals}
+    days_to_approve_values = []
+    for s in shifts_month_qs.filter(status=DrillShift.STATUS_APPROVED):
+        ts = approved_map.get(s.id)
+        if ts:
+            days_to_approve_values.append((ts.date() - s.date).days)
+    avg_days_to_approve = round(sum(days_to_approve_values) / len(days_to_approve_values), 1) if days_to_approve_values else 0
+
+    context = {
+        'meters_today': float(meters_today),
+        'meters_month': float(meters_month),
+        'avg_rop_24h': round(float(avg_rop_24h), 2),
+        'avg_recovery_24h': round(float(avg_recovery_24h), 2),
+        'downtime_labels': json.dumps(downtime_labels),
+        'downtime_values': json.dumps(downtime_values),
+        'rig_labels': json.dumps(rig_labels),
+        'rig_values': json.dumps(rig_values),
+        'rig_recovery': json.dumps(rig_recovery),
+        'top_issues': top_issues,
+        'active_alerts': active_alerts,
+        'alert_counts': alert_counts,
+        'total_active_alerts': active_alerts.count(),
+        # Workflow metrics
+        'draft_count': draft_count,
+        'submitted_count': submitted_count,
+        'approved_count': approved_count,
+        'rejected_count': rejected_count,
+        'client_pending_count': client_pending_count,
+        'client_approved_count': client_approved_count,
+        'client_rejected_count': client_rejected_count,
+        'avg_days_to_approve': avg_days_to_approve,
+        'off_target_alerts': off_target_alerts,
+        'client_performance': client_performance,
+        'location_performance': location_performance,
+        'active_clients_count': active_clients_count,
+    }
+    return render(request, 'core/home_dashboard.html', context)
+
+
+@login_required
+def analytics_dashboard(request):
+    """
+    Analytics dashboard showing 30-day trends and performance metrics.
+    
+    Displays trends using Chart.js:
+    - Daily meters drilled (last 30 days)
+    - ROP trend (last 30 days)
+    - Core recovery trend (last 30 days)
+    - Downtime trend (stacked by category)
+    - Material usage trend
+    - Bit/lifter performance (meters per bit type)
+    
+    Returns:
+        Rendered analytics template with trend data for charts
+    """
+    # Calculate date range (last 30 days)
+    end_date = timezone.now().date()
+    start_date = end_date - timedelta(days=30)
+    
+    # Allow filtering by date range
+    custom_start = request.GET.get('start_date')
+    custom_end = request.GET.get('end_date')
+    
+    if custom_start and custom_end:
+        try:
+            start_date = datetime.strptime(custom_start, '%Y-%m-%d').date()
+            end_date = datetime.strptime(custom_end, '%Y-%m-%d').date()
+        except ValueError:
+            messages.warning(request, 'Invalid date format. Using default 30-day range.')
+    
+    # Trend 1: Daily meters drilled
+    daily_meters = DrillingProgress.objects.filter(
+        shift__date__range=[start_date, end_date],
+        shift__status=DrillShift.STATUS_APPROVED
+    ).values('shift__date').annotate(
+        total_meters=Sum('meters_drilled')
+    ).order_by('shift__date')
+    
+    # Trend 2: ROP trend (daily average)
+    daily_rop = DrillingProgress.objects.filter(
+        shift__date__range=[start_date, end_date],
+        shift__status=DrillShift.STATUS_APPROVED,
+        penetration_rate__isnull=False
+    ).values('shift__date').annotate(
+        avg_rop=Avg('penetration_rate')
+    ).order_by('shift__date')
+    
+    # Trend 3: Core recovery trend (daily average)
+    daily_recovery = DrillingProgress.objects.filter(
+        shift__date__range=[start_date, end_date],
+        shift__status=DrillShift.STATUS_APPROVED,
+        recovery_percentage__isnull=False
+    ).values('shift__date').annotate(
+        avg_recovery=Avg('recovery_percentage')
+    ).order_by('shift__date')
+    
+    # Trend 4: Downtime by category (grouped)
+    downtime_by_category = ActivityLog.objects.filter(
+        shift__date__range=[start_date, end_date],
+        shift__status=DrillShift.STATUS_APPROVED,
+        duration_minutes__gt=0
+    ).exclude(activity_type='drilling').values('shift__date', 'activity_type').annotate(
+        total_hours=Sum('duration_minutes') / 60
+    ).order_by('shift__date', 'activity_type')
+    
+    # Trend 5: Material usage (sum by material type)
+    material_usage = MaterialUsed.objects.filter(
+        shift__date__range=[start_date, end_date],
+        shift__status=DrillShift.STATUS_APPROVED
+    ).values('material_name').annotate(
+        total_quantity=Sum('quantity')
+    ).order_by('-total_quantity')[:10]  # Top 10 materials
+    
+    # Trend 6: Bit performance (meters per bit size)
+    bit_performance = DrillingProgress.objects.filter(
+        shift__date__range=[start_date, end_date],
+        shift__status=DrillShift.STATUS_APPROVED,
+        size__isnull=False
+    ).values('size').annotate(
+        total_meters=Sum('meters_drilled'),
+        avg_recovery=Avg('recovery_percentage'),
+        count=Count('id')
+    ).order_by('-total_meters')
+    
+    # Format data for Chart.js
+    
+    # Daily meters chart
+    meters_dates = [item['shift__date'].strftime('%Y-%m-%d') for item in daily_meters]
+    meters_values = [float(item['total_meters']) for item in daily_meters]
+    
+    # ROP trend chart
+    rop_dates = [item['shift__date'].strftime('%Y-%m-%d') for item in daily_rop]
+    rop_values = [float(item['avg_rop']) for item in daily_rop]
+    
+    # Recovery trend chart
+    recovery_dates = [item['shift__date'].strftime('%Y-%m-%d') for item in daily_recovery]
+    recovery_values = [float(item['avg_recovery']) for item in daily_recovery]
+    
+    # Downtime stacked chart - organize by activity type
+    downtime_datasets = {}
+    downtime_dates_set = set()
+    for item in downtime_by_category:
+        date_str = item['shift__date'].strftime('%Y-%m-%d')
+        downtime_dates_set.add(date_str)
+        activity = item['activity_type']
+        if activity not in downtime_datasets:
+            downtime_datasets[activity] = {}
+        downtime_datasets[activity][date_str] = float(item['total_hours'])
+    
+    downtime_dates = sorted(list(downtime_dates_set))
+    downtime_chart_data = []
+    downtime_has_data = False
+    for activity, data in downtime_datasets.items():
+        values = [data.get(date, 0) for date in downtime_dates]
+        if any(v > 0 for v in values):
+            downtime_has_data = True
+        downtime_chart_data.append({
+            'label': activity,
+            'data': values
+        })
+
+    # Aggregate totals per activity for pie/donut chart
+    downtime_totals = {}
+    for item in downtime_by_category:
+        act = item['activity_type']
+        hours = float(item['total_hours']) if item['total_hours'] else 0
+        downtime_totals[act] = downtime_totals.get(act, 0) + hours
+
+    downtime_activity_labels = list(downtime_totals.keys())
+    downtime_activity_values = [round(downtime_totals[l], 2) for l in downtime_activity_labels]
+    
+    # Material usage chart
+    material_labels = [item['material_name'] for item in material_usage]
+    material_values = [float(item['total_quantity']) for item in material_usage]
+    
+    # Bit performance chart
+    bit_labels = [item['size'] for item in bit_performance]
+    bit_meters = [float(item['total_meters']) for item in bit_performance]
+    bit_recovery = [float(item['avg_recovery']) if item['avg_recovery'] else 0 for item in bit_performance]
+
+    # Monthly rig performance (current month)
+    rig_month = DrillingProgress.objects.filter(
+        shift__date__gte=start_date.replace(day=1),
+        shift__date__lte=end_date,
+        shift__status=DrillShift.STATUS_APPROVED,
+        shift__rig__isnull=False
+    ).exclude(shift__rig='').values('shift__rig').annotate(
+        total_meters=Sum('meters_drilled'),
+        avg_recovery=Avg('recovery_percentage'),
+        avg_rop=Avg('penetration_rate')
+    ).order_by('-total_meters')
+    rig_month_labels = [r['shift__rig'] for r in rig_month]
+    rig_month_meters = [float(r['total_meters']) for r in rig_month]
+    rig_month_recovery = [float(r['avg_recovery']) if r['avg_recovery'] else 0 for r in rig_month]
+    rig_month_rop = [float(r['avg_rop']) if r['avg_rop'] else 0 for r in rig_month]
+    
+    context = {
+        'start_date': start_date,
+        'end_date': end_date,
+        # Chart data as JSON
+        'meters_dates': json.dumps(meters_dates),
+        'meters_values': json.dumps(meters_values),
+        'rop_dates': json.dumps(rop_dates),
+        'rop_values': json.dumps(rop_values),
+        'recovery_dates': json.dumps(recovery_dates),
+        'recovery_values': json.dumps(recovery_values),
+        'downtime_dates': json.dumps(downtime_dates),
+        'downtime_datasets': json.dumps(downtime_chart_data),
+        'downtime_has_data': downtime_has_data,
+        'downtime_activity_labels': json.dumps(downtime_activity_labels),
+        'downtime_activity_values': json.dumps(downtime_activity_values),
+        'material_labels': json.dumps(material_labels),
+        'material_values': json.dumps(material_values),
+        'bit_labels': json.dumps(bit_labels),
+        'bit_meters': json.dumps(bit_meters),
+        'bit_recovery': json.dumps(bit_recovery),
+        'rig_month_labels': json.dumps(rig_month_labels),
+        'rig_month_meters': json.dumps(rig_month_meters),
+        'rig_month_recovery': json.dumps(rig_month_recovery),
+        'rig_month_rop': json.dumps(rig_month_rop),
+    }
+    return render(request, 'core/analytics_dashboard.html', context)
 
 
 @login_required
@@ -437,6 +837,8 @@ def shift_submit(request, pk):
     
     if request.method == 'POST':
         shift.status = DrillShift.STATUS_SUBMITTED
+        if shift.submitted_at is None:
+            shift.submitted_at = timezone.now()
         shift.save()
         
         # Create approval history entry
@@ -490,11 +892,23 @@ def shift_approve(request, pk):
             shift.is_locked = shift.status == DrillShift.STATUS_APPROVED
             
             # If approved and client is assigned, automatically submit to client
+            if decision == ApprovalHistory.DECISION_APPROVED:
+                if shift.manager_approved_at is None:
+                    shift.manager_approved_at = timezone.now()
             if decision == ApprovalHistory.DECISION_APPROVED and shift.client:
                 shift.client_status = DrillShift.CLIENT_PENDING
                 shift.submitted_to_client_at = timezone.now()
             
             shift.save()
+
+            # Generate alerts when shift is approved
+            if shift.status == DrillShift.STATUS_APPROVED:
+                from .utils import evaluate_shift_alerts
+                try:
+                    evaluate_shift_alerts(shift)
+                except Exception as e:
+                    # Non-critical: do not block approval on alert generation failure
+                    messages.warning(request, f'Approved but alert evaluation failed: {e}')
             
             # Record the approval decision
             ApprovalHistory.objects.create(

@@ -1,0 +1,38 @@
+/* Dashboard layout refinements */
+.kpi-card { border: 1px solid #e5e7eb; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); transition: box-shadow .2s ease, transform .2s ease; }
+.kpi-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.12); transform: translateY(-2px); }
+.kpi-icon { font-size: 1.75rem; margin-bottom: .35rem; }
+.kpi-value { font-size: 1.9rem; font-weight: 600; line-height: 1.1; }
+.kpi-label { font-size: .75rem; text-transform: uppercase; letter-spacing: .5px; color: #6c757d; }
+
+/* Card header neutral styling overrides (keep color emphasis minimal) */
+.card-header { font-weight: 600; }
+
+/* Force readable header text colors regardless of cascade */
+.card-header.bg-primary,
+.card-header.bg-danger,
+.card-header.bg-dark,
+.card-header.bg-info,
+.card-header.bg-success,
+.card-header.bg-secondary { color:#fff !important; }
+.card-header.bg-warning { color:#fff !important; }
+
+/* Allow explicit override via class */
+.contrast-header { color:#fff !important; }
+
+/* Ensure all chart headers are white regardless of background */
+.card-header.bg-primary h5,
+.card-header.bg-success h5,
+.card-header.bg-secondary h5,
+.card-header.bg-danger h5,
+.card-header.bg-dark h5,
+.card-header.bg-info h5,
+.card-header.bg-warning h5 { color:#fff !important; }
+
+/* Chart containers ensure consistent height */
+#rigPerformanceChart, #downtimeChart { min-height: 300px; }
+
+@media (max-width: 767px) {
+  .kpi-value { font-size: 1.5rem; }
+  #rigPerformanceChart, #downtimeChart { min-height: 240px; }
+}

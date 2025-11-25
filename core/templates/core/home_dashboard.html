@@ -1,0 +1,442 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block title %}Home Dashboard - Leos Investments Ltd{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <h2 class="mb-3"><i class="bi bi-speedometer2"></i> Manager Dashboard</h2>
+    </div>
+</div>
+
+<!-- Active Alerts Banner -->
+{% if total_active_alerts > 0 %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card border-warning shadow-sm">
+            <div class="card-header bg-warning text-white">
+                <h5 class="mb-0"><i class="bi bi-exclamation-triangle-fill"></i> Active Alerts ({{ total_active_alerts }})</h5>
+            </div>
+            <div class="card-body">
+                <div class="row g-2 mb-3">
+                    {% if alert_counts.critical > 0 %}
+                    <div class="col-6 col-md-3">
+                        <span class="badge bg-danger fs-6"><i class="bi bi-exclamation-octagon-fill"></i> {{ alert_counts.critical }} Critical</span>
+                    </div>
+                    {% endif %}
+                    {% if alert_counts.high > 0 %}
+                    <div class="col-6 col-md-3">
+                        <span class="badge bg-warning text-dark fs-6"><i class="bi bi-exclamation-triangle-fill"></i> {{ alert_counts.high }} High</span>
+                    </div>
+                    {% endif %}
+                    {% if alert_counts.medium > 0 %}
+                    <div class="col-6 col-md-3">
+                        <span class="badge bg-info fs-6"><i class="bi bi-info-circle-fill"></i> {{ alert_counts.medium }} Medium</span>
+                    </div>
+                    {% endif %}
+                    {% if alert_counts.low > 0 %}
+                    <div class="col-6 col-md-3">
+                        <span class="badge bg-secondary fs-6"><i class="bi bi-dash-circle-fill"></i> {{ alert_counts.low }} Low</span>
+                    </div>
+                    {% endif %}
+                </div>
+                <div class="list-group">
+                    {% for alert in active_alerts|slice:":5" %}
+                    <div class="list-group-item">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                {% if alert.severity == 'critical' %}
+                                <span class="badge bg-danger me-2">Critical</span>
+                                {% elif alert.severity == 'high' %}
+                                <span class="badge bg-warning text-dark me-2">High</span>
+                                {% elif alert.severity == 'medium' %}
+                                <span class="badge bg-info me-2">Medium</span>
+                                {% else %}
+                                <span class="badge bg-secondary me-2">Low</span>
+                                {% endif %}
+                                <strong>{{ alert.title }}</strong>
+                                <p class="mb-1 text-muted small">{{ alert.description }}</p>
+                                <small class="text-muted">
+                                    <i class="bi bi-calendar3"></i> {{ alert.shift.date }} | 
+                                    <i class="bi bi-truck"></i> {{ alert.shift.rig }}
+                                </small>
+                            </div>
+                            <a href="{% url 'core:shift_detail' alert.shift.id %}" class="btn btn-sm btn-outline-primary">
+                                <i class="bi bi-eye"></i> View
+                            </a>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- KPI Row 1: Workflow -->
+<div class="row g-3 mb-4">
+    <div class="col-6 col-xl-3">
+        <div class="card kpi-card h-100">
+            <div class="card-body text-center">
+                <div class="kpi-icon text-secondary"><i class="bi bi-pencil-square"></i></div>
+                <div class="kpi-value text-secondary">{{ draft_count }}</div>
+                <div class="kpi-label">Draft (Month)</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-xl-3">
+        <div class="card kpi-card h-100">
+            <div class="card-body text-center">
+                <div class="kpi-icon text-info"><i class="bi bi-upload"></i></div>
+                <div class="kpi-value text-info">{{ submitted_count }}</div>
+                <div class="kpi-label">Submitted</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-xl-3">
+        <div class="card kpi-card h-100">
+            <div class="card-body text-center">
+                <div class="kpi-icon text-success"><i class="bi bi-check-circle"></i></div>
+                <div class="kpi-value text-success">{{ approved_count }}</div>
+                <div class="kpi-label">Manager Approved</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-xl-3">
+        <div class="card kpi-card h-100">
+            <div class="card-body text-center">
+                <div class="kpi-icon text-primary"><i class="bi bi-arrow-repeat"></i></div>
+                <div class="kpi-value text-primary">{{ avg_days_to_approve }}</div>
+                <div class="kpi-label">Avg Days Approve</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- KPI Row 2: Client Status + Active Clients -->
+<div class="row g-3 mb-4">
+    <div class="col-6 col-xl-3">
+        <div class="card kpi-card h-100">
+            <div class="card-body text-center">
+                <div class="kpi-icon text-warning"><i class="bi bi-hourglass-split"></i></div>
+                <div class="kpi-value text-warning">{{ client_pending_count }}</div>
+                <div class="kpi-label">Client Pending</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-xl-3">
+        <div class="card kpi-card h-100">
+            <div class="card-body text-center">
+                <div class="kpi-icon text-success"><i class="bi bi-hand-thumbs-up"></i></div>
+                <div class="kpi-value text-success">{{ client_approved_count }}</div>
+                <div class="kpi-label">Client Approved</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-xl-3">
+        <div class="card kpi-card h-100">
+            <div class="card-body text-center">
+                <div class="kpi-icon text-danger"><i class="bi bi-hand-thumbs-down"></i></div>
+                <div class="kpi-value text-danger">{{ client_rejected_count }}</div>
+                <div class="kpi-label">Client Rejected</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-xl-3">
+        <div class="card kpi-card h-100">
+            <div class="card-body text-center">
+                <div class="kpi-icon text-dark"><i class="bi bi-people"></i></div>
+                <div class="kpi-value text-dark">{{ active_clients_count }}</div>
+                <div class="kpi-label">Active Clients</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- KPI Row 3: Performance Metrics -->
+<div class="row g-3 mb-4">
+    <div class="col-6 col-xl-3">
+        <div class="card kpi-card h-100">
+            <div class="card-body text-center">
+                <div class="kpi-icon text-primary"><i class="bi bi-speedometer2"></i></div>
+                <div class="kpi-value text-primary">{{ meters_today|floatformat:0 }}m</div>
+                <div class="kpi-label">Meters Today</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-xl-3">
+        <div class="card kpi-card h-100">
+            <div class="card-body text-center">
+                <div class="kpi-icon text-success"><i class="bi bi-calendar-check"></i></div>
+                <div class="kpi-value text-success">{{ meters_month|floatformat:0 }}m</div>
+                <div class="kpi-label">Meters Month</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-xl-3">
+        <div class="card kpi-card h-100">
+            <div class="card-body text-center">
+                <div class="kpi-icon text-info"><i class="bi bi-arrow-down-circle"></i></div>
+                <div class="kpi-value text-info">{{ avg_rop_24h }} m/hr</div>
+                <div class="kpi-label">Avg ROP 24h</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-xl-3">
+        <div class="card kpi-card h-100">
+            <div class="card-body text-center">
+                <div class="kpi-icon {% if avg_recovery_24h < 70 %}text-danger{% else %}text-warning{% endif %}"><i class="bi bi-percent"></i></div>
+                <div class="kpi-value {% if avg_recovery_24h < 70 %}text-danger{% else %}text-warning{% endif %}">{{ avg_recovery_24h }}%</div>
+                <div class="kpi-label">Recovery 24h</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Client/Project Performance Section -->
+<div class="row g-3 mb-4">
+    <!-- Client Performance Table -->
+    <div class="col-12 col-lg-6">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0"><i class="bi bi-building"></i> Client Performance (This Month)</h5>
+            </div>
+            <div class="card-body">
+                {% if client_performance %}
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th>Client</th>
+                                <th class="text-end">Meters</th>
+                                <th class="text-end">Avg ROP</th>
+                                <th class="text-end">Recovery</th>
+                                <th class="text-center">Shifts</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for client in client_performance %}
+                            <tr>
+                                <td><strong>{{ client.shift__client__name }}</strong></td>
+                                <td class="text-end">{{ client.total_meters|floatformat:2 }}m</td>
+                                <td class="text-end">{{ client.avg_rop|floatformat:2 }} m/hr</td>
+                                <td class="text-end">
+                                    <span class="{% if client.avg_recovery < 90 %}text-danger{% else %}text-success{% endif %} fw-bold">
+                                        {{ client.avg_recovery|floatformat:1 }}%
+                                    </span>
+                                </td>
+                                <td class="text-center">
+                                    <span class="badge bg-primary">{{ client.shift_count }}</span>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <p class="text-muted text-center mb-0"><i class="bi bi-info-circle"></i> No client data available</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Location/Project Performance Table -->
+    <div class="col-12 col-lg-6">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-info text-white">
+                <h5 class="mb-0"><i class="bi bi-geo-alt"></i> Project/Location Performance (This Month)</h5>
+            </div>
+            <div class="card-body">
+                {% if location_performance %}
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th>Location</th>
+                                <th class="text-end">Meters</th>
+                                <th class="text-end">Recovery</th>
+                                <th class="text-center">Shifts</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for location in location_performance %}
+                            <tr>
+                                <td><strong>{{ location.shift__location }}</strong></td>
+                                <td class="text-end">{{ location.total_meters|floatformat:2 }}m</td>
+                                <td class="text-end">
+                                    <span class="{% if location.avg_recovery < 90 %}text-warning{% else %}text-success{% endif %} fw-bold">
+                                        {{ location.avg_recovery|floatformat:1 }}%
+                                    </span>
+                                </td>
+                                <td class="text-center">
+                                    <span class="badge bg-secondary">{{ location.shift_count }}</span>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <p class="text-muted text-center mb-0"><i class="bi bi-info-circle"></i> No location data available</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Charts Row -->
+<div class="row g-3 mb-4">
+    <!-- Rig Performance Distribution (Donut) -->
+    <div class="col-12 col-lg-6">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="bi bi-truck"></i> Rig Meters Distribution (24h)</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="rigPerformanceChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Downtime Breakdown (Donut) -->
+    <div class="col-12 col-lg-6">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-warning text-white">
+                <h5 class="mb-0"><i class="bi bi-clock-history"></i> Downtime Breakdown (24h)</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="downtimeChart"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Top Issues Table -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card shadow-sm">
+            <div class="card-header bg-danger text-white">
+                <h5 class="mb-0"><i class="bi bi-exclamation-diamond"></i> Recent Issues & Comments</h5>
+            </div>
+            <div class="card-body">
+                {% if top_issues %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Rig</th>
+                                <th>Issue/Comment</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for issue in top_issues %}
+                            <tr>
+                                <td><span class="badge bg-secondary">{{ issue.date }}</span></td>
+                                <td><strong>{{ issue.rig }}</strong></td>
+                                <td>{{ issue.issue }}</td>
+                                <td>
+                                    <a href="{% url 'core:shift_detail' issue.shift_id %}" class="btn btn-sm btn-outline-primary">
+                                        <i class="bi bi-eye"></i> View
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <p class="text-muted text-center mb-0"><i class="bi bi-check-circle"></i> No recent issues reported</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Off-Target KPIs (High/Critical Alerts) -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card shadow-sm">
+            <div class="card-header bg-dark text-white">
+                <h5 class="mb-0"><i class="bi bi-bullseye"></i> Off-Target KPIs (Alerts)</h5>
+            </div>
+            <div class="card-body">
+                {% if off_target_alerts %}
+                <div class="table-responsive">
+                    <table class="table table-sm table-striped mb-0">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Rig</th>
+                                <th>Type</th>
+                                <th>Value</th>
+                                <th>Threshold</th>
+                                <th>Severity</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for a in off_target_alerts %}
+                            <tr>
+                                <td>{{ a.shift.date }}</td>
+                                <td>{{ a.shift.rig }}</td>
+                                <td>{{ a.get_alert_type_display }}</td>
+                                <td>{{ a.value }}</td>
+                                <td>{{ a.threshold }}</td>
+                                <td>
+                                    <span class="badge {% if a.severity == 'critical' %}bg-danger{% elif a.severity == 'high' %}bg-warning text-dark{% elif a.severity == 'medium' %}bg-info{% else %}bg-secondary{% endif %}">
+                                        {{ a.severity|title }}
+                                    </span>
+                                </td>
+                                <td><a class="btn btn-sm btn-outline-primary" href="{% url 'core:shift_detail' a.shift.id %}"><i class="bi bi-eye"></i></a></td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <p class="text-muted mb-0 text-center"><i class="bi bi-check-circle"></i> No off-target KPIs</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Actions -->
+<div class="row">
+    <div class="col-12">
+        <div class="card shadow-sm">
+            <div class="card-body text-center">
+                <h5 class="mb-3">Quick Actions</h5>
+                <a href="{% url 'core:shift_list' %}" class="btn btn-primary me-2 mb-2">
+                    <i class="bi bi-list-ul"></i> View All Shifts
+                </a>
+                <a href="{% url 'core:analytics_dashboard' %}" class="btn btn-info me-2 mb-2">
+                    <i class="bi bi-graph-up"></i> View Analytics
+                </a>
+                {% if user.is_staff or user.profile.is_supervisor %}
+                <a href="{% url 'core:shift_create' %}" class="btn btn-success mb-2">
+                    <i class="bi bi-plus-lg"></i> Create New Shift
+                </a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<!-- Embedded JSON data for external JS parsing -->
+<script type="application/json" id="rig-labels-json">{{ rig_labels|safe }}</script>
+<script type="application/json" id="rig-values-json">{{ rig_values|safe }}</script>
+<script type="application/json" id="downtime-labels-json">{{ downtime_labels|safe }}</script>
+<script type="application/json" id="downtime-values-json">{{ downtime_values|safe }}</script>
+<script src="{% static 'core/js/home_dashboard.js' %}"></script>
+{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'core/css/dashboard.css' %}">
+{% endblock %}

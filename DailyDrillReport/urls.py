@@ -21,11 +21,10 @@ from django.conf import settings
 from django.conf.urls.static import static
 
 urlpatterns = [
-    # Redirect root to shifts list
-    path('', RedirectView.as_view(url='/shifts/', permanent=True), name='home'),
+    # Redirect root to home dashboard
+    path('', include('core.urls', namespace='core')),
     
-    # Main app URLs
-    path('shifts/', include('core.urls', namespace='core')),
+    # Admin and accounts
     path('admin/', admin.site.urls),
     path('accounts/', include('accounts.urls', namespace='accounts')),
 ]
